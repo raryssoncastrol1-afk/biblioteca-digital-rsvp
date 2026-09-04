@@ -1,0 +1,29 @@
+# Dependências
+node_modules/
+package-lock.json
+
+# Logs e depuração
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+*.log
+
+# Variáveis de ambiente
+.env
+.env.local
+.env.*.local
+
+# Arquivos do sistema operacional
+.DS_Store
+Thumbs.db
+
+# IDEs e editores
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Builds temporários (opcional)
+dist/
+tmp/

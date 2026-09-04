@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Biblioteca Digital & Leitor RSVP Focus - Leitura dinâmica acelerada, ergonomia visual e gestão offline de acervos digitais." />
+  <meta name="theme-color" content="#090d16" />
+  <title>Biblioteca Digital & Leitor RSVP Focus</title>
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+
+  <!-- Fontes Científicas Ergonômicas -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&family=Lexend:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/opendyslexic@2.1.0/opendyslexic.css" />
+
+  <!-- Tailwind CSS via CDN com configuração inline -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            atkinson: ['"Atkinson Hyperlegible"', 'sans-serif'],
+            lexend: ['"Lexend"', 'sans-serif'],
+            dyslexic: ['"OpenDyslexic"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace']
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              900: '#312e81'
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    /* Estilos globais e scrollbar elegante */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.25);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(148, 163, 184, 0.45);
+    }
+    body {
+      background-color: #020617;
+      color: #f8fafc;
+      user-select: none;
+      -webkit-font-smoothing: antialiased;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- Bundle Transpilado via esbuild com cache buster v=2.2 -->
+  <script src="/reader.bundle.js?v=2.2"></script>
+
+  <!-- Registro do Service Worker PWA com atualização forçada -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(registrations => {
+        for (let reg of registrations) {
+          reg.update();
+        }
+      });
+      navigator.serviceWorker.register('/sw.js').catch(err => {
+        console.warn('Falha ao registrar Service Worker:', err);
+      });
+    }
+  </script>
+</body>
+</html>

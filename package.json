@@ -1,0 +1,28 @@
+{
+  "name": "biblioteca-digital-rsvp",
+  "version": "1.0.0",
+  "description": "Biblioteca Digital & Leitor RSVP Focus - Leitura dinâmica acelerada e gestão offline de acervos",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "build": "node build.js",
+    "watch": "node build.js --watch",
+    "start": "node server.js",
+    "dev": "node build.js && node server.js",
+    "test": "node test/engine.test.js && node test/parsers.test.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "jszip": "^3.10.1",
+    "lucide-react": "^0.475.0",
+    "multer": "^1.4.5-lts.1",
+    "pdfjs-dist": "^3.11.174",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tesseract.js": "^5.1.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}
