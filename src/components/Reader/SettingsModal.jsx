@@ -1,7 +1,9 @@
 import React from 'react';
 import { X, Sliders, Eye, Zap, Type, Palette } from 'lucide-react';
+import { useEscapeKey } from '../../hooks/useEscapeKey.js';
 
 export function SettingsModal({ isOpen, onClose, settings, onUpdateSettings }) {
+  useEscapeKey(onClose);
   if (!isOpen) return null;
 
   const fontOptions = [
@@ -130,14 +132,14 @@ export function SettingsModal({ isOpen, onClose, settings, onUpdateSettings }) {
           {/* Algoritmos Cognitivos */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
-              <Zap className="w-4 h-4 text-amber-400" /> Algoritmos de Modulação Cognitiva
+              <Zap className="w-4 h-4 text-amber-400" /> Ritmo de Leitura Inteligente
             </div>
 
             {/* Dwell Adaptativo */}
             <div className="flex items-center justify-between p-3 rounded-xl bg-slate-800/60 border border-slate-700/70">
               <div>
-                <div className="text-sm font-medium text-slate-200">Dwell-Time Adaptativo</div>
-                <div className="text-xs text-slate-400">Pausa maior em nomes próprios (+38%) e termos técnicos (+45%)</div>
+                <div className="text-sm font-medium text-slate-200">Adaptar ritmo ao texto</div>
+                <div className="text-xs text-slate-400">Pausa maior em nomes próprios e termos longos</div>
               </div>
               <input
                 type="checkbox"
@@ -150,8 +152,8 @@ export function SettingsModal({ isOpen, onClose, settings, onUpdateSettings }) {
             {/* Wrap-up Sintático */}
             <div className="flex items-center justify-between p-3 rounded-xl bg-slate-800/60 border border-slate-700/70">
               <div>
-                <div className="text-sm font-medium text-slate-200">Wrap-up Sintático</div>
-                <div className="text-xs text-slate-400">Pausas reflexivas em pontos finais (1.85x) e vírgulas (1.35x)</div>
+                <div className="text-sm font-medium text-slate-200">Pausas naturais de pontuação</div>
+                <div className="text-xs text-slate-400">Respiração em finais de frases e vírgulas para melhor compreensão</div>
               </div>
               <input
                 type="checkbox"

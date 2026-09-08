@@ -23,7 +23,8 @@ const buildOptions = {
   define: {
     'process.env.NODE_ENV': '"production"'
   },
-  sourcemap: true,
+  minify: true,
+  sourcemap: isWatch, // sourcemaps apenas em desenvolvimento (watch)
   logLevel: 'info'
 };
 

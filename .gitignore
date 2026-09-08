@@ -24,6 +24,9 @@ Thumbs.db
 *.swp
 *.swo
 
+# Tooling local do opencode
+.opencode/
+
 # Builds temporários (opcional)
 dist/
 tmp/

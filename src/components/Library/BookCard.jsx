@@ -43,35 +43,34 @@ export function BookCard({ book, onOpenFullReader, onOpenMiniPlayer, onOpenDetai
         <button
           onClick={(e) => {
             e.stopPropagation();
-            if (confirm(`Remover "${book.title}" da sua estante?`)) {
-              onDelete(book.id);
-            }
+            onDelete(book.id);
           }}
-          className="absolute top-3 right-3 p-1.5 rounded-lg bg-slate-900/80 text-slate-400 hover:text-red-400 hover:bg-slate-900 transition opacity-0 group-hover:opacity-100"
+          className="absolute top-3 right-3 p-2.5 rounded-lg bg-slate-900/80 text-slate-400 hover:text-red-400 hover:bg-slate-900 transition opacity-0 group-hover:opacity-100 hover-reveal"
           title="Excluir livro"
         >
           <Trash2 className="w-4 h-4" />
         </button>
 
-        {/* Overlay com Botões Rápidos */}
-        <div className="absolute inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center gap-2.5 opacity-0 group-hover:opacity-100 transition duration-200">
+        {/* Overlay com Botões Rápidos (sempre visível em telas touch via .hover-reveal) */}
+        <div className="absolute inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100 hover-reveal transition duration-200">
+          {/* Ação primária: maior e mais destacada (Von Restorff) */}
           <button
             onClick={() => onOpenFullReader(book.id)}
-            className="p-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-lg transition transform hover:scale-105"
+            className="p-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-lg shadow-indigo-600/40 transition transform hover:scale-110 active:scale-95"
             title="Abrir Leitor Completo"
           >
-            <Play className="w-5 h-5 fill-white" />
+            <Play className="w-6 h-6 fill-white" />
           </button>
           <button
             onClick={() => onOpenMiniPlayer(book.id)}
-            className="p-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl shadow-lg transition transform hover:scale-105"
-            title="Abrir no Mini-Player"
+            className="p-2.5 bg-slate-800/80 hover:bg-slate-700 text-slate-200 rounded-xl shadow transition transform hover:scale-105 active:scale-95"
+            title="Mini Player (Leitura Rápida)"
           >
             <Eye className="w-5 h-5" />
           </button>
           <button
             onClick={() => onOpenDetails && onOpenDetails(book.id)}
-            className="p-3 bg-slate-800 hover:bg-slate-700 text-indigo-300 rounded-xl shadow-lg transition transform hover:scale-105"
+            className="p-2.5 bg-slate-800/80 hover:bg-slate-700 text-slate-200 rounded-xl shadow transition transform hover:scale-105 active:scale-95"
             title="Ver Detalhes & Índice"
           >
             <Info className="w-5 h-5" />

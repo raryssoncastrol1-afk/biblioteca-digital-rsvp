@@ -3,6 +3,7 @@ import {
   X, Play, BookOpen, Clock, FileText, Calendar, 
   Globe, Building2, CheckCircle2, Bookmark, BookText, Search
 } from 'lucide-react';
+import { useEscapeKey } from '../../hooks/useEscapeKey.js';
 
 export function BookDetailsModal({
   isOpen,
@@ -13,6 +14,8 @@ export function BookDetailsModal({
   onOpenFullReader
 }) {
   const [searchTerm, setSearchTerm] = useState('');
+
+  useEscapeKey(onClose);
 
   if (!isOpen || !book) return null;
 

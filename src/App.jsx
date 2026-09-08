@@ -1,17 +1,15 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  getAllBooks, saveBook, getBookById, deleteBook, 
-  updateBookProgress, saveDocumentContent, getDocumentContent,
-  getSetting, setSetting
-} from './services/db.js';
+import React, { useState, useCallback } from 'react';
 import { parseDocument } from './services/parsers/index.js';
 import { generateDynamicCover } from './services/parsers/coverGenerator.js';
+import { getSetting, setSetting } from './services/db.js';
+import { useBooks } from './hooks/useBooks.js';
 import { LibraryView } from './components/Library/LibraryView.jsx';
 import { RSVPReader } from './components/Reader/RSVPReader.jsx';
 import { MiniPlayerModal } from './components/Library/MiniPlayerModal.jsx';
 import { ChapterModal } from './components/Reader/ChapterModal.jsx';
 import { SettingsModal } from './components/Reader/SettingsModal.jsx';
 import { BookDetailsModal } from './components/Library/BookDetailsModal.jsx';
+import { Toast } from './components/ui/Toast.jsx';
 
 const DEFAULT_SETTINGS = {
   fontFamily: 'Atkinson Hyperlegible, sans-serif',
@@ -23,7 +21,7 @@ const DEFAULT_SETTINGS = {
 };
 
 export function App() {
-  const [books, setBooks] = useState([]);
+  const { books, addBook, removeBook, updateProgress, loadBookWithDoc } = useBooks();
   const [activeBook, setActiveBook] = useState(null);
   const [activeDoc, setActiveDoc] = useState(null);
 
@@ -35,28 +33,22 @@ export function App() {
 
   const [isChaptersOpen, setIsChaptersOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [seekIndex, setSeekIndex] = useState(null);
+  const [seekNonce, setSeekNonce] = useState(0);
 
   const [isProcessingUpload, setIsProcessingUpload] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [toast, setToast] = useState(null); // { type: 'success' | 'error', message }
 
   const [settings, setAppSettings] = useState(DEFAULT_SETTINGS);
 
-  // Carrega livros e configurações do IndexedDB na inicialização
-  useEffect(() => {
-    async function init() {
-      try {
-        const storedBooks = await getAllBooks();
-        setBooks(storedBooks);
-
-        const storedSettings = await getSetting('userSettings', DEFAULT_SETTINGS);
-        if (storedSettings) {
-          setAppSettings(storedSettings);
-        }
-      } catch (err) {
-        console.error('Erro ao inicializar IndexedDB:', err);
-      }
-    }
-    init();
+  // Carrega configurações do IndexedDB na inicialização
+  React.useEffect(() => {
+    getSetting('userSettings', DEFAULT_SETTINGS)
+      .then((stored) => {
+        if (stored) setAppSettings(stored);
+      })
+      .catch((err) => console.error('Erro ao carregar configurações:', err));
   }, []);
 
   // Atualiza configurações persistindo no IndexedDB
@@ -66,75 +58,62 @@ export function App() {
     await setSetting('userSettings', updated);
   };
 
+  // Abre um livro no contexto informado (full reader, mini-player ou detalhes)
+  const openBook = async (bookId, setters) => {
+    try {
+      const { book, doc } = await loadBookWithDoc(bookId) || {};
+      if (book && doc) setters(book, doc);
+    } catch (err) {
+      console.error(`Erro ao abrir livro ${bookId}:`, err);
+    }
+  };
+
   // Abrir Leitor Completo
   const handleOpenFullReader = async (bookId, startingWordIndex = null) => {
-    try {
-      const book = await getBookById(bookId);
-      const doc = await getDocumentContent(bookId);
-      if (book && doc) {
-        if (startingWordIndex !== null) {
-          book.currentWordIndex = startingWordIndex;
-          book.progressPercent = doc.tokens.length > 0 ? Math.min(100, Math.round((startingWordIndex / doc.tokens.length) * 100)) : 0;
-          await updateBookProgress(bookId, startingWordIndex, doc.tokens.length, book.lastWpm);
-        }
-        setActiveBook(book);
-        setActiveDoc(doc);
+    const open = async (book, doc) => {
+      if (startingWordIndex !== null) {
+        book.currentWordIndex = startingWordIndex;
+        book.progressPercent = doc.tokens.length > 0 ? Math.min(100, Math.round((startingWordIndex / doc.tokens.length) * 100)) : 0;
+        await updateProgress(bookId, startingWordIndex, doc.tokens.length, book.lastWpm);
       }
-    } catch (err) {
-      console.error('Erro ao abrir leitor:', err);
-    }
+      setActiveBook(book);
+      setActiveDoc(doc);
+    };
+    await openBook(bookId, open);
   };
 
   // Abrir Mini-Player Modal
   const handleOpenMiniPlayer = async (bookId) => {
-    try {
-      const book = await getBookById(bookId);
-      const doc = await getDocumentContent(bookId);
-      if (book && doc) {
-        setMiniBook(book);
-        setMiniDoc(doc);
-      }
-    } catch (err) {
-      console.error('Erro ao abrir mini-player:', err);
-    }
+    await openBook(bookId, (book, doc) => {
+      setMiniBook(book);
+      setMiniDoc(doc);
+    });
   };
 
   // Abrir Modal de Detalhes & Índice
   const handleOpenDetails = async (bookId) => {
-    try {
-      const book = await getBookById(bookId);
-      const doc = await getDocumentContent(bookId);
-      if (book && doc) {
-        setDetailsBook(book);
-        setDetailsDoc(doc);
-      }
-    } catch (err) {
-      console.error('Erro ao abrir detalhes:', err);
-    }
+    await openBook(bookId, (book, doc) => {
+      setDetailsBook(book);
+      setDetailsDoc(doc);
+    });
   };
 
   // Salvar Progresso
   const handleSaveProgress = useCallback(async (currentIndex, totalWords, wpm) => {
     if (!activeBook && !miniBook) return;
     const targetBook = activeBook || miniBook;
-    try {
-      const updated = await updateBookProgress(targetBook.id, currentIndex, totalWords, wpm);
-      if (updated) {
-        setBooks(prev => prev.map(b => b.id === updated.id ? updated : b));
-        if (activeBook && activeBook.id === updated.id) setActiveBook(updated);
-        if (miniBook && miniBook.id === updated.id) setMiniBook(updated);
-        if (detailsBook && detailsBook.id === updated.id) setDetailsBook(updated);
-      }
-    } catch (err) {
-      console.error('Erro ao salvar progresso:', err);
+    const updated = await updateProgress(targetBook.id, currentIndex, totalWords, wpm);
+    if (updated) {
+      if (activeBook && activeBook.id === updated.id) setActiveBook(updated);
+      if (miniBook && miniBook.id === updated.id) setMiniBook(updated);
+      if (detailsBook && detailsBook.id === updated.id) setDetailsBook(updated);
     }
-  }, [activeBook, miniBook, detailsBook]);
+  }, [activeBook, miniBook, detailsBook, updateProgress]);
 
   // Excluir Livro
   const handleDeleteBook = async (bookId) => {
     try {
-      await deleteBook(bookId);
-      setBooks(prev => prev.filter(b => b.id !== bookId));
+      await removeBook(bookId);
       if (activeBook && activeBook.id === bookId) {
         setActiveBook(null);
         setActiveDoc(null);
@@ -156,6 +135,9 @@ export function App() {
   const handleImportFiles = async (fileList) => {
     setIsProcessingUpload(true);
     setUploadProgress(10);
+
+    let importedCount = 0;
+    let failedCount = 0;
 
     for (let i = 0; i < fileList.length; i++) {
       const file = fileList[i];
@@ -190,13 +172,12 @@ export function App() {
           rawText: parsed.rawText
         };
 
-        await saveBook(bookMetadata);
-        await saveDocumentContent(bookId, docContent);
-
-        setBooks(prev => [bookMetadata, ...prev]);
+        await addBook(bookMetadata, docContent);
+        importedCount++;
       } catch (err) {
         console.error(`Erro ao importar ${file.name}:`, err);
-        alert(`Falha ao processar o arquivo ${file.name}: ${err.message}`);
+        failedCount++;
+        setToast({ type: 'error', message: `Falha ao processar "${file.name}": ${err.message}` });
       }
     }
 
@@ -205,6 +186,13 @@ export function App() {
       setIsProcessingUpload(false);
       setUploadProgress(0);
     }, 500);
+
+    if (importedCount > 0) {
+      setToast({
+        type: 'success',
+        message: `${importedCount} ${importedCount === 1 ? 'livro importado' : 'livros importados'}${failedCount > 0 ? ` (${failedCount} falha${failedCount > 1 ? 's' : ''})` : ''}.`
+      });
+    }
   };
 
   // Carregar Livro Clássico de Exemplo (Dom Casmurro de Machado de Assis)
@@ -266,10 +254,7 @@ Ia esquecendo dizer que este Engenho Novo era então um arrabalde quase despovoa
       rawText: sampleText
     };
 
-    await saveBook(sampleMetadata);
-    await saveDocumentContent(bookId, sampleDoc);
-
-    setBooks(prev => [sampleMetadata, ...prev]);
+    await addBook(sampleMetadata, sampleDoc);
     setIsProcessingUpload(false);
     setUploadProgress(0);
   };
@@ -287,10 +272,13 @@ Ia esquecendo dizer que este Engenho Novo era então um arrabalde quase despovoa
           onBackToLibrary={() => {
             setActiveBook(null);
             setActiveDoc(null);
+            setSeekIndex(null);
           }}
           onOpenChapters={() => setIsChaptersOpen(true)}
           onOpenSettings={() => setIsSettingsOpen(true)}
           settings={settings}
+          seekIndex={seekIndex}
+          seekNonce={seekNonce}
         />
 
         <ChapterModal
@@ -300,7 +288,8 @@ Ia esquecendo dizer que este Engenho Novo era então um arrabalde quase despovoa
           currentIndex={activeBook.currentWordIndex || 0}
           wpm={activeBook.lastWpm || 350}
           onSelectChapter={(index) => {
-            handleSaveProgress(index, activeDoc.tokens.length, activeBook.lastWpm);
+            setSeekIndex(index);
+            setSeekNonce(n => n + 1);
           }}
         />
 
@@ -371,6 +360,15 @@ Ia esquecendo dizer que este Engenho Novo era então um arrabalde quase despovoa
           }}
           onSaveProgress={handleSaveProgress}
           settings={settings}
+        />
+      )}
+
+      {/* Feedback de Importação */}
+      {toast && (
+        <Toast
+          type={toast.type}
+          message={toast.message}
+          onDismiss={() => setToast(null)}
         />
       )}
     </>

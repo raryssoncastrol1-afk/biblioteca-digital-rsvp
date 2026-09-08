@@ -30,21 +30,17 @@ Além do leitor acelerado, a aplicação conta com uma **Estante Digital Multifo
   - Numerais e Estrangeirismos: `+40%`
 - **Wrap-up Sintático:** Pausas reflexivas proporcionais no final de períodos (`.!?` → `1.85x`) e vírgulas/pausas (`:,;—` → `1.35x`).
 
-### 🧬 2. Modo Leitura Biônica (*Bionic Reading*)
-- Alternância em tempo real com a tecla <kbd>M</kbd> para leitura em bloco com fixação artificial e destaque em negrito nos prefixos das palavras.
-- Navegação interativa: clique em qualquer palavra do texto biônico para retomar a leitura RSVP exatamente daquele ponto.
-
-### 📚 3. Estante Digital Multiformato & Parsers no Cliente
+### 🧬 2. Estante Digital Multiformato & Parsers no Cliente
 - Suporte nativo a **EPUB, PDF, DOCX, TXT, MD, MOBI e AZW3**.
 - **Extração Vetorial & OCR WebAssembly:** Processamento de PDFs via *Mozilla PDF.js* com fallback inteligente para *Tesseract.js (WASM)* para extração de textos em PDFs escaneados.
 - **3 Modos de Visualização:** Grade (*cards* com capas e métricas), Lista detalhada e Tabela.
 - **Mini-Player RSVP Modal:** Permite degustar e ler rapidamente qualquer documento diretamente da estante.
 
-### 💾 4. Arquitetura 100% Offline-First
+### 💾 3. Arquitetura 100% Offline-First
 - Persistência assíncrona robusta via **IndexedDB** (`BibliotecaRSVP_DB` e `RSVP_Reader_Docs_DB`) e Service Worker PWA (*Network-First* com fallback offline).
 - Armazenamento local de metadados, capas, progresso percentual, último WPM e histórico de leitura.
 
-### 👁️ 5. Ergonomia Visual & Tipografia Científica
+### 👁️ 4. Ergonomia Visual & Tipografia Científica
 - Fontes otimizadas para leitura e acessibilidade: **Atkinson Hyperlegible**, **Lexend** e **OpenDyslexic**.
 - 4 temas visuais: **AMOLED Preto**, **Slate Escuro**, **Sépia Suave** e **Luz Diurna**.
 - Cores personalizáveis para a mira foveal (Vermelho Foveal, Âmbar Dourado, Verde Esmeralda, Ciano Neônio, Púrpura).
@@ -60,7 +56,6 @@ Além do leitor acelerado, a aplicação conta com uma **Estante Digital Multifo
 | <kbd>↑</kbd> / <kbd>↓</kbd> | Aumentar / Reduzir velocidade (+25 / -25 WPM) |
 | <kbd>C</kbd> | Abrir modal de Capítulos e Índice |
 | <kbd>S</kbd> | Abrir Configurações Científicas e Temas |
-| <kbd>M</kbd> | Alternar entre Leitura RSVP e Modo Biônico |
 | <kbd>F</kbd> | Alternar Modo Tela Cheia |
 | <kbd>R</kbd> | Reiniciar leitura do documento |
 

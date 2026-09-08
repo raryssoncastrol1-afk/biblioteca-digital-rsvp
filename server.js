@@ -1,17 +1,12 @@
 import express from 'express';
-import cors from 'cors';
-import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createApiApp } from './api/app.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-app.use(cors());
-app.use(express.json());
+const app = createApiApp();
 
 // Evita que o navegador retenha versões antigas de scripts e html em desenvolvimento
 app.use((req, res, next) => {
@@ -21,37 +16,6 @@ app.use((req, res, next) => {
     res.setHeader('Expires', '0');
   }
   next();
-});
-
-// Memória temporária no servidor para sincronização opcional
-const memoryBooksStore = [];
-
-// Configuração do Multer para uploads em memória
-const upload = multer({ 
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 } // 50MB
-});
-
-// Endpoint de listagem de livros no servidor
-app.get('/api/books', (req, res) => {
-  res.json({ success: true, books: memoryBooksStore });
-});
-
-// Endpoint de upload multipart
-app.post('/api/upload', upload.array('files'), (req, res) => {
-  const uploadedFiles = req.files || [];
-  const processed = uploadedFiles.map(file => ({
-    name: file.originalname,
-    size: file.size,
-    mimeType: file.mimetype,
-    uploadedAt: Date.now()
-  }));
-
-  res.json({ 
-    success: true, 
-    count: uploadedFiles.length, 
-    files: processed 
-  });
 });
 
 // Servir arquivos estáticos do PWA
@@ -69,6 +33,7 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Biblioteca Digital & Leitor RSVP Focus rodando em: http://localhost:${PORT}`);
 });

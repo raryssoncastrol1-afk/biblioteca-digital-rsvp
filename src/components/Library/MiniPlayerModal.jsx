@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Play, Pause, Maximize2, ChevronLeft, ChevronRight, Bookmark } from 'lucide-react';
 import { calculateORP, calculateDwellTime } from '../../engine/orp.js';
 import { TargetCrosshair } from '../Reader/TargetCrosshair.jsx';
+import { useEscapeKey } from '../../hooks/useEscapeKey.js';
 
 export function MiniPlayerModal({ 
   isOpen, 
@@ -19,6 +20,10 @@ export function MiniPlayerModal({
   const [currentIndex, setCurrentIndex] = useState(initialIndex || 0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [wpm, setWpm] = useState(book.lastWpm || 350);
+
+  useEscapeKey(() => {
+    if (isOpen) handleClose();
+  });
 
   const timerRef = useRef(null);
   const isPlayingRef = useRef(isPlaying);

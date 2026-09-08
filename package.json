@@ -8,7 +8,7 @@
     "watch": "node build.js --watch",
     "start": "node server.js",
     "dev": "node build.js && node server.js",
-    "test": "node test/engine.test.js"
+    "test": "node test/engine.test.js && node test/parsers.test.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

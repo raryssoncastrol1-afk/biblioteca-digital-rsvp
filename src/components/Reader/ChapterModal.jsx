@@ -1,8 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { X, BookOpen, CheckCircle, Search, Clock, ChevronRight } from 'lucide-react';
+import { useEscapeKey } from '../../hooks/useEscapeKey.js';
 
 export function ChapterModal({ isOpen, onClose, chapters = [], currentIndex = 0, onSelectChapter, wpm = 350 }) {
   const [searchTerm, setSearchTerm] = useState('');
+
+  useEscapeKey(onClose);
 
   const filteredChapters = useMemo(() => {
     if (!searchTerm.trim()) return chapters;

@@ -60,10 +60,10 @@ export function BookList({ books, onOpenFullReader, onOpenMiniPlayer, onOpenDeta
             </div>
 
             {/* Ações */}
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2.5 shrink-0">
               <button
                 onClick={() => onOpenDetails && onOpenDetails(book.id)}
-                className="p-2 rounded-xl border border-slate-700 hover:bg-slate-800 text-indigo-400 hover:text-indigo-300 transition"
+                className="p-2.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-indigo-400 hover:text-indigo-300 transition"
                 title="Ver Detalhes & Índice"
               >
                 <Bookmark className="w-4 h-4" />
@@ -71,25 +71,23 @@ export function BookList({ books, onOpenFullReader, onOpenMiniPlayer, onOpenDeta
 
               <button
                 onClick={() => onOpenMiniPlayer(book.id)}
-                className="p-2 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 transition"
-                title="Mini-Player"
+                className="p-2.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 transition"
+                title="Mini Player (Leitura Rápida)"
               >
                 <Eye className="w-4 h-4" />
               </button>
 
               <button
                 onClick={() => onOpenFullReader(book.id)}
-                className="flex items-center gap-2 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow transition"
+                className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow transition"
               >
                 <Play className="w-3.5 h-3.5 fill-white" />
                 <span>Ler</span>
               </button>
 
               <button
-                onClick={() => {
-                  if (confirm(`Excluir "${book.title}"?`)) onDelete(book.id);
-                }}
-                className="p-2 text-slate-500 hover:text-red-400 rounded-xl hover:bg-slate-800 transition"
+                onClick={() => onDelete(book.id)}
+                className="p-2.5 text-slate-500 hover:text-red-400 rounded-xl hover:bg-slate-800 transition"
                 title="Excluir"
               >
                 <Trash2 className="w-4 h-4" />

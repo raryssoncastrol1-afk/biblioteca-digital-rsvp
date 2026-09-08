@@ -1,11 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { 
   LayoutGrid, List, Table2, Search, Upload, BookOpen, 
-  Sparkles, Filter, CheckCircle2, Zap, Clock
+  Sparkles, CheckCircle2, Zap
 } from 'lucide-react';
 import { BookCard } from './BookCard.jsx';
 import { BookList } from './BookList.jsx';
 import { BookTable } from './BookTable.jsx';
+import { ConfirmDialog } from '../ui/ConfirmDialog.jsx';
 
 export function LibraryView({
   books,
@@ -22,15 +23,38 @@ export function LibraryView({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFormat, setSelectedFormat] = useState('ALL');
   const [isDragOver, setIsDragOver] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(null); // book aguardando confirmação
+
+  // Filtros de formato agrupados (7 formatos suportados → 5 grupos, evitando sobrecarga de decisão)
+  const formatGroups = [
+    { id: 'ALL', label: 'Todos' },
+    { id: 'EPUB', label: 'EPUB' },
+    { id: 'PDF', label: 'PDF' },
+    { id: 'DOCX', label: 'DOCX' },
+    { id: 'TEXT', label: 'Texto (TXT/MD)' },
+    { id: 'EBOOK', label: 'Ebook (MOBI/AZW3)' }
+  ];
 
   // Filtros
   const filteredBooks = useMemo(() => {
+    const matchesFormat = (format) => {
+      if (selectedFormat === 'ALL') return true;
+      switch (selectedFormat) {
+        case 'TEXT':
+          return format === 'TXT' || format === 'MD';
+        case 'EBOOK':
+          return format === 'MOBI' || format === 'AZW3';
+        default:
+          return format === selectedFormat;
+      }
+    };
+
     return books.filter(b => {
       const matchQuery = 
         b.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (b.author && b.author.toLowerCase().includes(searchQuery.toLowerCase()));
       
-      const matchFormat = selectedFormat === 'ALL' || b.format === selectedFormat;
+      const matchFormat = matchesFormat(b.format);
 
       return matchQuery && matchFormat;
     });
@@ -63,6 +87,12 @@ export function LibraryView({
     if (e.target.files && e.target.files.length > 0) {
       onImportFiles(e.target.files);
     }
+  };
+
+  // Solicita exclusão: abre o diálogo de confirmação estilizado com o livro alvo
+  const handleRequestDelete = (bookId) => {
+    const book = books.find(b => b.id === bookId);
+    if (book) setPendingDelete(book);
   };
 
   return (
@@ -183,18 +213,18 @@ export function LibraryView({
 
           <div className="flex items-center gap-3">
             {/* Filtro de Formato */}
-            <div className="flex items-center gap-1.5 bg-slate-950/80 p-1 rounded-xl border border-slate-800 text-xs">
-              {['ALL', 'EPUB', 'PDF', 'DOCX', 'TXT'].map(fmt => (
+            <div className="flex items-center gap-1.5 bg-slate-950/80 p-1 rounded-xl border border-slate-800 text-xs overflow-x-auto">
+              {formatGroups.map(fg => (
                 <button
-                  key={fmt}
-                  onClick={() => setSelectedFormat(fmt)}
-                  className={`px-2.5 py-1 rounded-lg font-medium transition ${
-                    selectedFormat === fmt 
+                  key={fg.id}
+                  onClick={() => setSelectedFormat(fg.id)}
+                  className={`px-2.5 py-1 rounded-lg font-medium whitespace-nowrap transition ${
+                    selectedFormat === fg.id 
                       ? 'bg-indigo-600 text-white shadow-xs' 
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  {fmt === 'ALL' ? 'Todos' : fmt}
+                  {fg.label}
                 </button>
               ))}
             </div>
@@ -253,7 +283,7 @@ export function LibraryView({
                     onOpenFullReader={onOpenFullReader}
                     onOpenMiniPlayer={onOpenMiniPlayer}
                     onOpenDetails={onOpenDetails}
-                    onDelete={onDeleteBook}
+                    onDelete={handleRequestDelete}
                   />
                 ))}
               </div>
@@ -265,7 +295,7 @@ export function LibraryView({
                 onOpenFullReader={onOpenFullReader}
                 onOpenMiniPlayer={onOpenMiniPlayer}
                 onOpenDetails={onOpenDetails}
-                onDelete={onDeleteBook}
+                onDelete={handleRequestDelete}
               />
             )}
 
@@ -275,7 +305,7 @@ export function LibraryView({
                 onOpenFullReader={onOpenFullReader}
                 onOpenMiniPlayer={onOpenMiniPlayer}
                 onOpenDetails={onOpenDetails}
-                onDelete={onDeleteBook}
+                onDelete={handleRequestDelete}
               />
             )}
           </>
@@ -287,6 +317,20 @@ export function LibraryView({
       <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-600">
         Biblioteca Digital & Leitor RSVP Focus • Arquitetura Offline-First (IndexedDB) • WebAssembly OCR
       </footer>
+
+      {/* Diálogo de Confirmação de Exclusão */}
+      {pendingDelete && (
+        <ConfirmDialog
+          title="Excluir livro?"
+          message={`"${pendingDelete.title}" de ${pendingDelete.author || 'Autor Desconhecido'} será removido permanentemente da sua estante, incluindo o progresso de leitura.`}
+          confirmLabel="Excluir"
+          onConfirm={() => {
+            onDeleteBook(pendingDelete.id);
+            setPendingDelete(null);
+          }}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
     </div>
   );
 }

@@ -66,15 +66,22 @@
       user-select: none;
       -webkit-font-smoothing: antialiased;
     }
+    /* Em dispositivos touch (sem hover), elementos que só aparecem no hover
+       devem ficar sempre visíveis para não esconder ações importantes. */
+    @media (hover: none) {
+      .hover-reveal {
+        opacity: 1 !important;
+      }
+    }
   </style>
 </head>
 <body>
   <div id="root"></div>
 
-  <!-- Bundle Transpilado via esbuild com cache buster v=2.2 -->
-  <script src="/reader.bundle.js?v=2.2"></script>
+  <!-- Bundle Transpilado e Minificado via esbuild -->
+  <script src="/reader.bundle.js"></script>
 
-  <!-- Registro do Service Worker PWA com atualização forçada -->
+  <!-- Registro do Service Worker PWA com atualização automática -->
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(registrations => {
@@ -82,7 +89,7 @@
           reg.update();
         }
       });
-      navigator.serviceWorker.register('/sw.js').catch(err => {
+      navigator.serviceWorker.register('/sw.js?v=3').catch(err => {
         console.warn('Falha ao registrar Service Worker:', err);
       });
     }
