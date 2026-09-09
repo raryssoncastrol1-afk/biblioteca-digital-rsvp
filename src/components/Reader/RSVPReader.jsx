@@ -7,6 +7,7 @@ import {
 import { calculateORP, calculateDwellTime } from '../../engine/orp.js';
 import { TargetCrosshair } from './TargetCrosshair.jsx';
 import { HelpModal } from './HelpModal.jsx';
+import { useSwipeGesture } from '../../hooks/useSwipeGesture.js';
 
 export function RSVPReader({
   book,
@@ -23,6 +24,7 @@ export function RSVPReader({
 }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex || 0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isFinished, setIsFinished] = useState(false);
   const [wpm, setWpm] = useState(book.lastWpm || 350);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
@@ -51,6 +53,7 @@ export function RSVPReader({
     currentIndexRef.current = seekIndex;
     setCurrentIndex(seekIndex);
     setIsPlaying(false);
+    setIsFinished(false);
     if (timerRef.current) clearTimeout(timerRef.current);
   }, [seekIndex, seekNonce]);
 
@@ -80,6 +83,7 @@ export function RSVPReader({
   // Funções para saltar entre capítulos
   const handlePrevChapter = useCallback(() => {
     if (chapters.length === 0) return;
+    setIsFinished(false);
     if (currentChapterIndex > 0) {
       setCurrentIndex(chapters[currentChapterIndex - 1].startIndex);
     } else {
@@ -89,6 +93,7 @@ export function RSVPReader({
 
   const handleNextChapter = useCallback(() => {
     if (chapters.length === 0) return;
+    setIsFinished(false);
     if (currentChapterIndex >= 0 && currentChapterIndex < chapters.length - 1) {
       setCurrentIndex(chapters[currentChapterIndex + 1].startIndex);
     }
@@ -100,6 +105,7 @@ export function RSVPReader({
 
     if (currentIndexRef.current >= tokens.length - 1) {
       setIsPlaying(false);
+      setIsFinished(true);
       return;
     }
 
@@ -134,11 +140,19 @@ export function RSVPReader({
         setCurrentIndex(0);
         currentIndexRef.current = 0;
       }
+      setIsFinished(false);
       setIsPlaying(true);
       isPlayingRef.current = true;
       scheduleNextWord();
     }
   }, [scheduleNextWord, tokens.length]);
+
+  // Gestos de swipe para mobile (play/pause, avançar, voltar)
+  const swipeHandlers = useSwipeGesture({
+    onSwipeRight: togglePlay,
+    onSwipeLeft: () => setCurrentIndex(prev => Math.min(tokens.length - 1, prev + 10)),
+    onDoubleTap: togglePlay
+  });
 
   // Limpeza de timer ao desmontar
   useEffect(() => {
@@ -238,7 +252,7 @@ export function RSVPReader({
     <div className={`min-h-screen flex flex-col justify-between select-none ${themeClasses}`} style={{ fontFamily: settings.fontFamily }}>
       
       {/* HEADER */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-current/10 backdrop-blur-sm bg-inherit/80 z-20">
+      <header className="flex items-center justify-between px-6 py-4 border-b border-current/10 backdrop-blur-md bg-inherit/70 z-20">
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <button 
             onClick={onBackToLibrary}
@@ -251,7 +265,7 @@ export function RSVPReader({
             <h1 className="font-bold text-sm sm:text-base truncate max-w-xs sm:max-w-md">{book.title}</h1>
             <button 
               onClick={onOpenChapters}
-              className="text-xs opacity-75 hover:opacity-100 flex items-center gap-1.5 transition text-indigo-400 truncate text-left mt-0.5"
+              className="text-xs opacity-60 hover:opacity-100 flex items-center gap-1.5 transition truncate text-left mt-0.5"
               title="Abrir Índice de Capítulos (C)"
             >
               <Bookmark className="w-3 h-3 shrink-0" />
@@ -270,7 +284,7 @@ export function RSVPReader({
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-current/20 hover:bg-current/10 text-xs font-semibold transition"
             title="Capítulos e Índice (C)"
           >
-            <BookOpen className="w-4 h-4 text-indigo-400" />
+            <BookOpen className="w-4 h-4" />
             <span className="hidden md:inline">Índice</span>
           </button>
 
@@ -304,7 +318,10 @@ export function RSVPReader({
       </header>
 
       {/* PALCO CENTRAL RSVP */}
-      <main className="flex-1 flex flex-col items-center justify-center relative px-4">
+      <main 
+        className="flex-1 flex flex-col items-center justify-center relative px-4"
+        {...swipeHandlers}
+      >
         <div className="relative w-full max-w-2xl h-44 sm:h-56 flex items-center justify-center">
           
           {/* Mira Visual Foveal */}
@@ -313,7 +330,7 @@ export function RSVPReader({
           {/* Renderização Central Fixada do ORP */}
           <div 
             className="w-full flex items-baseline font-mono tracking-tight leading-none"
-            style={{ fontSize: `${settings.fontSize || 52}px` }}
+            style={{ fontSize: `min(${settings.fontSize || 52}px, calc((100vw - 48px) / 12))` }}
           >
             {/* Prefixo (alinhado à direita do centro) */}
             <span className="flex-1 text-right opacity-90 truncate pr-0.5 select-none">
@@ -340,15 +357,66 @@ export function RSVPReader({
         </div>
 
         {/* Indicador de Pausa / Contexto */}
-        {!isPlaying && (
+        {!isPlaying && !isFinished && (
           <div className="mt-4 text-xs tracking-wide uppercase opacity-50 font-mono animate-pulse">
-            Pressione Espaço para iniciar ou pausar
+            <span className="hidden sm:inline">Pressione Espaço para iniciar ou pausar</span>
+            <span className="sm:hidden">Toque duplo para play/pause • Deslize para avançar</span>
+          </div>
+        )}
+
+        {/* Conclusão da leitura: o desfecho da jornada (Peak–End) */}
+        {isFinished && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-6 os-fade-in">
+            {/* Warm radial glow behind completion text */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="w-80 h-80 rounded-full" style={{ background: `radial-gradient(circle, ${(settings.accentColor || '#ef4444')}15 0%, transparent 65%)` }} />
+            </div>
+            <div className="relative text-center max-w-xl">
+              <div className="w-16 h-0.5 mx-auto rounded-full mb-6" style={{ backgroundColor: settings.accentColor || '#ef4444', opacity: 0.4 }} />
+              <h2 className="text-3xl sm:text-4xl font-black tracking-tight leading-tight font-display">Você terminou!</h2>
+              <p className="opacity-70 mt-2 truncate max-w-md mx-auto text-sm">{book.title}</p>
+              <div className="mt-6 grid grid-cols-3 gap-3 text-center">
+                <div className="px-4 py-3 rounded-2xl border border-current/10 bg-current/5">
+                  <div className="text-lg font-black font-mono leading-none">{tokens.length.toLocaleString()}</div>
+                  <div className="text-[11px] uppercase tracking-wider opacity-50 mt-1.5">palavras</div>
+                </div>
+                <div className="px-4 py-3 rounded-2xl border border-current/10 bg-current/5">
+                  <div className="text-lg font-black font-mono leading-none">~{Math.max(1, Math.round(tokens.length / wpm))}</div>
+                  <div className="text-[11px] uppercase tracking-wider opacity-50 mt-1.5">min lidos</div>
+                </div>
+                <div className="px-4 py-3 rounded-2xl border border-current/10 bg-current/5">
+                  <div className="text-lg font-black font-mono leading-none">{wpm}</div>
+                  <div className="text-[11px] uppercase tracking-wider opacity-50 mt-1.5">WPM</div>
+                </div>
+              </div>
+              <div className="mt-8 flex items-center justify-center gap-3 flex-wrap">
+                <button
+                  onClick={() => {
+                    currentIndexRef.current = 0;
+                    setCurrentIndex(0);
+                    setIsFinished(false);
+                  }}
+                  className="px-5 py-2.5 rounded-xl border border-current/20 hover:bg-current/10 text-sm font-semibold transition"
+                >
+                  <RotateCcw className="w-4 h-4 inline mr-1.5 -mt-0.5" />
+                  Ler novamente
+                </button>
+                <button
+                  onClick={onBackToLibrary}
+                  className="px-5 py-2.5 rounded-xl text-white text-sm font-bold transition"
+                  style={{ backgroundColor: settings.accentColor || '#ef4444' }}
+                >
+                  <BookOpen className="w-4 h-4 inline mr-1.5 -mt-0.5" />
+                  Voltar à estante
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </main>
 
       {/* FOOTER & CONTROLES */}
-      <footer className="px-6 py-5 border-t border-current/10 backdrop-blur-md bg-inherit/80 space-y-4 z-20">
+      <footer className="px-6 py-5 border-t border-current/10 backdrop-blur-md bg-inherit/70 space-y-4 z-20">
         
         {/* Barra de Progresso Interativa */}
         <div className="space-y-1.5">
@@ -362,49 +430,16 @@ export function RSVPReader({
             max={Math.max(0, tokens.length - 1)}
             value={currentIndex}
             onChange={(e) => setCurrentIndex(Number(e.target.value))}
-            className="w-full h-1.5 bg-current/20 rounded-lg accent-indigo-500 cursor-pointer"
+            className="w-full h-1.5 bg-current/20 rounded-lg cursor-pointer"
+            style={{ accentColor: settings.accentColor || '#ef4444' }}
           />
         </div>
 
         {/* Barra de Controles Principais */}
-        <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="space-y-4">
           
-          {/* Seletor de Velocidade (WPM) — núcleo de leitura */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setWpm(prev => Math.max(100, prev - 25))}
-              className="px-3 py-2 rounded-lg border border-current/20 hover:bg-current/10 text-xs font-mono font-bold"
-              title="Diminuir velocidade (-25 WPM)"
-            >
-              −25
-            </button>
-
-            <div className="flex flex-col items-center px-1">
-              <span className="text-xl font-mono font-black tracking-tight leading-none">{wpm}</span>
-              <span className="text-[10px] uppercase tracking-wider opacity-60 font-semibold mt-0.5">WPM</span>
-              <input
-                type="range"
-                min="100"
-                max="2000"
-                step="25"
-                value={wpm}
-                onChange={(e) => setWpm(Number(e.target.value))}
-                className="w-24 h-1 mt-1.5 bg-current/20 rounded-lg accent-indigo-500 cursor-pointer"
-                title="Ajustar velocidade"
-              />
-            </div>
-
-            <button
-              onClick={() => setWpm(prev => Math.min(2000, prev + 25))}
-              className="px-3 py-2 rounded-lg border border-current/20 hover:bg-current/10 text-xs font-mono font-bold"
-              title="Aumentar velocidade (+25 WPM)"
-            >
-              +25
-            </button>
-          </div>
-
-          {/* Núcleo de Reprodução: retroceder, play/pause, avançar — sempre visível */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          {/* Linha Principal: Playback (sempre visível e centralizado) */}
+          <div className="flex items-center justify-center gap-2 sm:gap-3">
             <button
               onClick={() => setCurrentIndex(prev => Math.max(0, prev - 10))}
               className="p-3 rounded-xl border border-current/20 hover:bg-current/10 transition"
@@ -415,8 +450,10 @@ export function RSVPReader({
 
             <button
               onClick={togglePlay}
-              className="p-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 transition transform hover:scale-105 active:scale-95"
+              className="p-4 rounded-2xl text-white shadow-lg transition transform hover:scale-105 active:scale-95"
+              style={{ backgroundColor: settings.accentColor || '#ef4444', boxShadow: `0 10px 20px -8px ${(settings.accentColor || '#ef4444')}66` }}
               title="Play / Pause (Espaço)"
+              aria-label={isPlaying ? 'Pausar' : 'Reproduzir'}
             >
               {isPlaying ? <Pause className="w-6 h-6 fill-white" /> : <Play className="w-6 h-6 fill-white ml-0.5" />}
             </button>
@@ -430,33 +467,74 @@ export function RSVPReader({
             </button>
           </div>
 
-          {/* Navegação Auxiliar: capítulos e reinício — menor destaque, agrupados */}
-          <div className="flex items-center gap-2 opacity-70 hover:opacity-100 transition">
-            <button
-              onClick={handlePrevChapter}
-              disabled={currentChapterIndex <= 0}
-              className="p-2.5 rounded-xl border border-current/20 hover:bg-current/10 transition disabled:opacity-30 disabled:cursor-not-allowed"
-              title="Capítulo Anterior ( [ )"
-            >
-              <SkipBack className="w-4 h-4" />
-            </button>
+          {/* Linha Secundária: WPM + Navegação (empilhado em mobile, lado a lado em desktop) */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+            {/* Seletor de Velocidade (WPM) */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setWpm(prev => Math.max(100, prev - 25))}
+                className="px-3 py-2 rounded-lg border border-current/20 hover:bg-current/10 text-xs font-mono font-bold"
+                title="Diminuir velocidade (-25 WPM)"
+              >
+                −25
+              </button>
 
-            <button
-              onClick={handleNextChapter}
-              disabled={currentChapterIndex >= chapters.length - 1}
-              className="p-2.5 rounded-xl border border-current/20 hover:bg-current/10 transition disabled:opacity-30 disabled:cursor-not-allowed"
-              title="Próximo Capítulo ( ] )"
-            >
-              <SkipForward className="w-4 h-4" />
-            </button>
+              <div className="flex flex-col items-center px-1">
+                <span className="text-xl font-mono font-black tracking-tight leading-none">{wpm}</span>
+                <span className="text-[10px] uppercase tracking-wider opacity-60 font-semibold mt-0.5">WPM</span>
+                <input
+                  type="range"
+                  min="100"
+                  max="2000"
+                  step="25"
+                  value={wpm}
+                  onChange={(e) => setWpm(Number(e.target.value))}
+                  className="w-24 h-1 mt-1.5 bg-current/20 rounded-lg cursor-pointer"
+                  style={{ accentColor: settings.accentColor || '#ef4444' }}
+                  title="Ajustar velocidade"
+                />
+              </div>
 
-            <button
-              onClick={() => setCurrentIndex(0)}
-              className="p-2.5 rounded-xl border border-current/20 hover:bg-current/10 transition"
-              title="Reiniciar Leitura do Início (R)"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
+              <button
+                onClick={() => setWpm(prev => Math.min(2000, prev + 25))}
+                className="px-3 py-2 rounded-lg border border-current/20 hover:bg-current/10 text-xs font-mono font-bold"
+                title="Aumentar velocidade (+25 WPM)"
+              >
+                +25
+              </button>
+            </div>
+
+            {/* Separador visual (só em desktop) */}
+            <div className="hidden sm:block w-px h-6 bg-current/10" />
+
+            {/* Navegação Auxiliar: capítulos e reinício */}
+            <div className="flex items-center gap-2 opacity-70 hover:opacity-100 transition">
+              <button
+                onClick={handlePrevChapter}
+                disabled={currentChapterIndex <= 0}
+                className="p-2.5 rounded-xl border border-current/20 hover:bg-current/10 transition disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Capítulo Anterior ( [ )"
+              >
+                <SkipBack className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={handleNextChapter}
+                disabled={currentChapterIndex >= chapters.length - 1}
+                className="p-2.5 rounded-xl border border-current/20 hover:bg-current/10 transition disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Próximo Capítulo ( ] )"
+              >
+                <SkipForward className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={() => setCurrentIndex(0)}
+                className="p-2.5 rounded-xl border border-current/20 hover:bg-current/10 transition"
+                title="Reiniciar Leitura do Início (R)"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
         </div>

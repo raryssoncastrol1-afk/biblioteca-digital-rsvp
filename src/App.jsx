@@ -46,10 +46,27 @@ export function App() {
   React.useEffect(() => {
     getSetting('userSettings', DEFAULT_SETTINGS)
       .then((stored) => {
-        if (stored) setAppSettings(stored);
+        if (stored) {
+          setAppSettings(stored);
+          // Apply saved app theme
+          const appTheme = stored.appTheme || 'system';
+          const isDark = appTheme === 'dark' || (appTheme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.classList.toggle('dark', isDark);
+        }
       })
       .catch((err) => console.error('Erro ao carregar configurações:', err));
   }, []);
+
+  // Scroll-lock quando modais estão abertos
+  const anyModalOpen = isChaptersOpen || isSettingsOpen || miniBook || detailsBook;
+  React.useEffect(() => {
+    if (anyModalOpen) {
+      document.body.classList.add('modal-open');
+    } else {
+      document.body.classList.remove('modal-open');
+    }
+    return () => document.body.classList.remove('modal-open');
+  }, [anyModalOpen]);
 
   // Atualiza configurações persistindo no IndexedDB
   const handleUpdateSettings = async (newSettings) => {
@@ -112,6 +129,7 @@ export function App() {
 
   // Excluir Livro
   const handleDeleteBook = async (bookId) => {
+    const book = books.find(b => b.id === bookId);
     try {
       await removeBook(bookId);
       if (activeBook && activeBook.id === bookId) {
@@ -126,8 +144,12 @@ export function App() {
         setDetailsBook(null);
         setDetailsDoc(null);
       }
+      if (book) {
+        setToast({ type: 'success', message: `"${book.title}" foi removido da estante.` });
+      }
     } catch (err) {
       console.error('Erro ao deletar livro:', err);
+      setToast({ type: 'error', message: 'Não foi possível excluir o livro. Tente novamente.' });
     }
   };
 
@@ -177,7 +199,10 @@ export function App() {
       } catch (err) {
         console.error(`Erro ao importar ${file.name}:`, err);
         failedCount++;
-        setToast({ type: 'error', message: `Falha ao processar "${file.name}": ${err.message}` });
+        setToast({
+          type: 'error',
+          message: `Não foi possível processar "${file.name}". O arquivo pode estar corrompido ou em um formato não suportado.`
+        });
       }
     }
 
@@ -274,8 +299,14 @@ Ia esquecendo dizer que este Engenho Novo era então um arrabalde quase despovoa
             setActiveDoc(null);
             setSeekIndex(null);
           }}
-          onOpenChapters={() => setIsChaptersOpen(true)}
-          onOpenSettings={() => setIsSettingsOpen(true)}
+          onOpenChapters={() => {
+            setIsSettingsOpen(false);
+            setIsChaptersOpen(true);
+          }}
+          onOpenSettings={() => {
+            setIsChaptersOpen(false);
+            setIsSettingsOpen(true);
+          }}
           settings={settings}
           seekIndex={seekIndex}
           seekNonce={seekNonce}
