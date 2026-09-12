@@ -30,3 +30,8 @@ Thumbs.db
 # Builds temporários (opcional)
 dist/
 tmp/
+
+# Assets PDF.js gerados pelo build (regeneráveis com `npm run build`)
+public/pdf.worker.min.mjs
+public/pdf-cmaps/
+public/pdf-standard-fonts/

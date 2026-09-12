@@ -1,9 +1,10 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import { performOcrOnCanvas } from './ocrService.js';
 
-// Configura o worker do PDF.js
+// Configura o worker do PDF.js localmente (offline-first, sem CDN).
+// O build (build.js) copia o worker para public/ durante a compilação.
 if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 }
 
 /**
@@ -38,7 +39,12 @@ async function resolveDestinationPage(pdfDoc, dest) {
  */
 export async function parsePdfFile(file, onProgress) {
   const arrayBuffer = await file.arrayBuffer();
-  const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+  const loadingTask = pdfjsLib.getDocument({
+    data: new Uint8Array(arrayBuffer),
+    cMapUrl: '/pdf-cmaps/',
+    cMapPacked: true,
+    standardFontDataUrl: '/pdf-standard-fonts/'
+  });
   const pdfDoc = await loadingTask.promise;
 
   const numPages = pdfDoc.numPages;
