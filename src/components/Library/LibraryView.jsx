@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   LayoutGrid, List, Table2, Search, Upload, BookOpen, 
   Sparkles, Library
@@ -19,11 +19,16 @@ export function LibraryView({
   isProcessingUpload,
   uploadProgress
 }) {
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list' | 'table'
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem('rsvp-view-mode') || 'grid'); // 'grid' | 'list' | 'table'
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFormat, setSelectedFormat] = useState('ALL');
   const [isDragOver, setIsDragOver] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(null); // book aguardando confirmação
+
+  // Persiste a visualização escolhida (grade/lista/tabela) entre sessões
+  useEffect(() => {
+    localStorage.setItem('rsvp-view-mode', viewMode);
+  }, [viewMode]);
 
   // Filtros de formato agrupados (7 formatos suportados → 5 grupos, evitando sobrecarga de decisão)
   const formatGroups = [
