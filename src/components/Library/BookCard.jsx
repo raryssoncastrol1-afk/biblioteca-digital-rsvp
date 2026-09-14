@@ -22,7 +22,7 @@ export function BookCard({ book, onOpenFullReader, onOpenMiniPlayer, onOpenDetai
     <div className="group relative dark:bg-ink-900 bg-white dark:border-ink-700 border-paper-200 rounded-2xl overflow-hidden hover:border-brand-500/50 hover:shadow-xl hover:shadow-brand-500/10 transition flex flex-col justify-between">
 
       {/* Top Capa / Preview */}
-      <div className="relative h-48 dark:bg-ink-950 bg-paper-50 flex items-center justify-center overflow-hidden border-b dark:border-ink-700 border-paper-200">
+      <div className="relative aspect-[2/3] sm:aspect-auto sm:h-48 dark:bg-ink-950 bg-paper-50 flex items-center justify-center overflow-hidden border-b dark:border-ink-700 border-paper-200">
         {book.coverDataUrl ? (
           <img
             src={book.coverDataUrl}
@@ -105,13 +105,13 @@ export function BookCard({ book, onOpenFullReader, onOpenMiniPlayer, onOpenDetai
 
         <div className="mt-4 space-y-2.5">
           {/* Métricas */}
-          <div className="flex items-center justify-between text-[11px] dark:text-paper-400 text-ink-500">
+          <div className="flex items-center justify-between gap-2 flex-wrap text-[11px] dark:text-paper-400 text-ink-500">
             <span className="flex items-center gap-1">
               <BookOpen className="w-3.5 h-3.5" />
               <span>{(book.totalWords || 0).toLocaleString()} pal.</span>
             </span>
             {estimatedMin && (
-              <span className="flex items-center gap-1">
+              <span className="flex items-center gap-1 hidden min-[380px]:flex">
                 <Clock className="w-3.5 h-3.5" />
                 <span>~{estimatedMin} min</span>
               </span>
@@ -123,7 +123,7 @@ export function BookCard({ book, onOpenFullReader, onOpenMiniPlayer, onOpenDetai
               aria-label={`Índice de ${book.title}`}
             >
               <Bookmark className="w-3.5 h-3.5" />
-              <span>Índice</span>
+              <span className="hidden sm:inline">Índice</span>
             </button>
           </div>
 

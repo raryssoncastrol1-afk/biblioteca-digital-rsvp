@@ -4,8 +4,52 @@ import { generateDynamicCover } from '../src/services/parsers/coverGenerator.js'
 
 console.log('🧪 Iniciando testes de Parsers, Metadados e Índices...\n');
 
+// 0. Teste de Detecção de Subseções Numéricas (X.Y) e Capítulos com marcadores variados
+console.log('Testando detecção de subseções numéricas e capítulos com marcadores variados...');
+
+const sampleNumbered = [
+  '1. Introdução',
+  'Texto introdutório com várias palavras para testar.',
+  '',
+  '1.1. Contexto Histórico',
+  'Texto do contexto com mais palavras aqui.',
+  '',
+  '2. Desenvolvimento',
+  'Texto do desenvolvimento.',
+  '',
+  '2.1 Detalhes do Meio',
+  'Detalhes do meio do livro.',
+].join('\n');
+
+const numberedFile = {
+  name: 'numerado.txt',
+  text: async () => sampleNumbered
+};
+
+parseTxtFile(numberedFile).then(parsedNum => {
+  const titles = parsedNum.chapters.map(c => c.title);
+  assert(titles.includes('1. Introdução'), 'Capítulo principal "1. Introdução" deve ser detectado');
+  assert(titles.includes('1.1. Contexto Histórico'), 'Subseção "1.1. Contexto Histórico" deve ser detectada');
+  assert(titles.includes('2. Desenvolvimento'), 'Capítulo "2. Desenvolvimento" deve ser detectado');
+  assert(titles.includes('2.1 Detalhes do Meio'), 'Subseção "2.1 Detalhes do Meio" deve ser detectada');
+
+  for (let i = 0; i < parsedNum.chapters.length; i++) {
+    const ch = parsedNum.chapters[i];
+    assert(ch.startIndex >= 0, 'startIndex deve ser >= 0');
+    assert(ch.endIndex >= ch.startIndex, 'endIndex deve ser >= startIndex');
+    if (i < parsedNum.chapters.length - 1) {
+      assert.strictEqual(ch.endIndex, parsedNum.chapters[i + 1].startIndex, 'Capítulo deve cobrir até o próximo');
+    }
+  }
+  console.log('✔ Subseções numéricas e capítulos com marcadores variados detectados.');
+  console.log(`  Títulos obtidos: ${titles.join(' | ')}`);
+}).catch(err => {
+  console.error('❌ Falha no teste de subseções:', err);
+  process.exit(1);
+});
+
 // 1. Teste de Parse de TXT com Frontmatter YAML e Cabeçalhos
-console.log('Testando parseTxtFile com metadados e capítulos...');
+console.log('\nTestando parseTxtFile com metadados e capítulos...');
 
 const sampleMarkdown = `---
 title: "Memórias Póstumas de Brás Cubas"

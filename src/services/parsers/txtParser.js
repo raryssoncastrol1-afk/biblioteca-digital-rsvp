@@ -40,11 +40,17 @@ export async function parseTxtFile(file) {
 
     const lineWords = line.split(/\s+/).filter(Boolean);
     const isMdHeading = /^#+\s+/.test(line);
+    // Título vira capítulo quando: é marcação Markdown, ou é uma linha curta
+    // (menos de ~80 chars) que começa com marcador estrutural —
+    // "Capítulo N" (com . : — - _ ou nada), "Parte N", "Seção N", "1.", "1.1.",
+    // ou palavras-chave (Sumário, Introdução, Prefácio, Conclusão, etc.).
     const isChapterHeading = line.length < 80 && (
-      /^cap[íi]tulo\s+[0-9ivxlcdm]+/i.test(line) ||
-      /^parte\s+[0-9ivxlcdm]+/i.test(line) ||
-      /^(sum[áa]rio|índice|introdução|prefácio|conclusão|epílogo|prólogo)/i.test(line) ||
-      /^\d+\.?\s+[A-ZÁÀÂÃÉÊÍÓÔÕÚÇ]/.test(line)
+      /^cap[íi]tulo\b/i.test(line) ||                       // Capítulo / Capítulo 1 / Capítulo I
+      /^parte\b/i.test(line) ||                             // Parte 1 / Parte I
+      /^se[çc][ãa]o\b/i.test(line) ||                       // Seção 1
+      /^anexo\b/i.test(line) ||                             // Anexo A / Anexo 1
+      /^\d+(\.\d+)*\.?\s+[A-ZÁÀÂÃÉÊÍÓÔÕÚÇ0-9]/.test(line) || // "1. Introdução", "1.1. Título", "2.1.1 Exemplo"
+      /^(sum[áa]rio|índice|introdu[çc][ãa]o|pref[áa]cio|conclus[ãa]o|ep[íi]logo|pr[óo]logo|agradecimentos|refer[êe]ncias|bibliografia|ap[êe]ndice)/i.test(line)
     );
 
     const cleanTitle = line.replace(/^#+\s*/, '').trim();

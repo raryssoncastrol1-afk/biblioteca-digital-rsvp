@@ -1,5 +1,6 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import { performOcrOnCanvas } from './ocrService.js';
+import { extractChaptersFromSummary } from './pdfSummary.js';
 
 // Configura o worker do PDF.js localmente (offline-first, sem CDN).
 // O build (build.js) copia o worker para public/ durante a compilação.
@@ -81,9 +82,24 @@ export async function parsePdfFile(file, onProgress) {
     // Registra o offset inicial desta página
     pageWordOffsets.push(currentWordOffset);
 
-    // Extrai o conteúdo de texto da página
+    // Extrai o conteúdo de texto da página preservando quebras de linha reais.
+    // Estratégia dupla: usa item.hasEOL quando disponível; além disso, detecta
+    // quebra de linha pela posição X (quando o item volta para a esquerda, é nova linha).
     const textContent = await page.getTextContent();
-    let pageText = textContent.items.map(item => item.str).join(' ').trim();
+    let pageText = '';
+    let prevX = null;
+    for (const item of textContent.items) {
+      if (!item.str) continue;
+      const x = item.transform ? item.transform[4] : null;
+      // Nova linha se: hasEOL marcado, OU o X retrocedeu significativamente
+      const newLine = item.hasEOL === true ||
+        (prevX !== null && x !== null && x < prevX - 5);
+      if (pageText && newLine) pageText += '\n';
+      pageText += item.str;
+      if (item.hasEOL === true) pageText += '\n';
+      prevX = x;
+    }
+    pageText = pageText.replace(/\s*\n\s*/g, '\n').trim();
 
     // Se a página tiver quase nenhum texto, tenta OCR via Tesseract WASM
     if (pageText.length < 15 && typeof document !== 'undefined') {
@@ -206,7 +222,25 @@ export async function parsePdfFile(file, onProgress) {
     console.warn('Não foi possível ler sumário nativo do PDF:', outlineErr);
   }
 
-  // Fallback: se não tiver sumário nativo, detecta seções ou cria páginas lógicas
+  // Fallback: se não tiver sumário nativo, tenta extrair o SUMÁRIO impresso (página de "Sumário"/"Índice")
+  if (chapters.length === 0) {
+    try {
+      const summaryChapters = extractChaptersFromSummary(rawParagraphs, pageWordOffsets, numPages);
+      if (summaryChapters.length > 0) {
+        // Ajusta endIndex para cada capítulo (até o próximo início)
+        for (let i = 0; i < summaryChapters.length; i++) {
+          summaryChapters[i].id = `pdf-summary-${i + 1}`;
+          summaryChapters[i].endIndex =
+            i < summaryChapters.length - 1 ? summaryChapters[i + 1].startIndex : words.length;
+        }
+        chapters = summaryChapters;
+      }
+    } catch (summaryErr) {
+      console.warn('Não foi possível extrair sumário impresso do PDF:', summaryErr);
+    }
+  }
+
+  // Fallback final: se não tiver sumário nativo nem impresso, detecta seções ou cria páginas lógicas
   if (chapters.length === 0) {
     // Detecta capítulos por regex no texto de cada página
     const detectedHeadings = [];

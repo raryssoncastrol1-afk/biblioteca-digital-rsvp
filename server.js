@@ -33,7 +33,11 @@ app.get('/{*splat}', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+import os from 'os';
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 Biblioteca Digital & Leitor RSVP Focus rodando em: http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  const nets = Object.values(os.networkInterfaces()).flat().filter(i => i.family === 'IPv4' && !i.internal);
+  const lanIP = nets.length > 0 ? nets[0].address : '0.0.0.0';
+  console.log(`🚀 Biblioteca rodando em: http://${lanIP}:${PORT} (LAN) ou http://localhost:${PORT} (local)`);
 });
