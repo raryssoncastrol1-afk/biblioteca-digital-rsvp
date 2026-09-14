@@ -35,3 +35,6 @@ tmp/
 public/pdf.worker.min.mjs
 public/pdf-cmaps/
 public/pdf-standard-fonts/
+
+# Hermes (agente AI)
+.hermes/
