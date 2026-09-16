@@ -9,6 +9,52 @@ if (typeof window !== 'undefined') {
 }
 
 /**
+ * Preenche apenas os campos vazios a partir do mapa XMP (ex.: metadata.getAll() do pdfjs).
+ * O Info dictionary tem prioridade — XMP só cobre lacunas.
+ */
+export function applyXmpFallback(fields, xmpMap) {
+  if (!xmpMap || typeof xmpMap !== 'object') return fields;
+  for (const [key, value] of Object.entries(xmpMap)) {
+    const clean = (Array.isArray(value) ? value.join(', ') : String(value ?? '')).trim();
+    if (!clean) continue;
+    const k = key.toLowerCase();
+    if (!fields.title && (k.endsWith(':title') || k === 'title')) fields.title = clean;
+    if (!fields.author && k.endsWith(':creator')) fields.author = clean;
+    if (!fields.description && (k.endsWith(':description') || k.endsWith(':subject'))) fields.description = clean;
+    if (!fields.publisher && (k.endsWith(':publisher') || k.endsWith('producer') || k.endsWith('creatortool'))) fields.publisher = clean;
+    if (!fields.publishedDate && (k.endsWith(':date') || k.endsWith('createdate') || k.endsWith('modifydate'))) fields.publishedDate = clean;
+    if (!fields.isbn && k.includes('isbn')) fields.isbn = clean;
+    if (!fields.language && k.endsWith(':language')) fields.language = clean;
+  }
+  return fields;
+}
+
+/**
+ * Degrau 4 (heurística honesta): infere título/autor do texto/OCR da 1ª página.
+ * Só preenche o que encontrar; não adivinha campos ausentes.
+ * ponytail: heurística simples — capa escaneada ilegível retorna vazio (sem false positives
+ * de autor). Upgrade: OCR de página inteira + NER local, se a taxa de erro incomodar.
+ */
+export function inferMetadataFromFirstPage(pageText) {
+  const lines = (pageText || '').split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length === 0) return { title: '', author: '' };
+  const authorLine = lines.find(l => /^(por|de|by)\s+\S+/i.test(l));
+  const author = authorLine
+    ? authorLine.replace(/^(por|de|by)\s+/i, '').split(/[,;\n]/)[0].slice(0, 60).trim()
+    : '';
+  let title = '';
+  for (const line of lines.slice(0, 6)) {
+    if (line.length < 3 || line.length > 90) continue;
+    if (/^(por|de|by)\s/i.test(line)) continue;
+    if (/^\d+$/.test(line) || /^página\s*\d+$/i.test(line)) continue;
+    if (/[-—·]{4,}/.test(line)) continue;
+    title = line;
+    break;
+  }
+  return { title, author };
+}
+
+/**
  * Resolve o número da página de um destino de outline/marcador do PDF
  */
 async function resolveDestinationPage(pdfDoc, dest) {
@@ -129,33 +175,51 @@ export async function parsePdfFile(file, onProgress) {
     }
   }
 
-  // Extrai metadados do documento PDF
+  // Extrai metadados do documento PDF (Info dictionary + fallback XMP + OCR da 1ª página)
   let title = file.name.replace(/\.[^/.]+$/, "");
   let author = "Autor Desconhecido";
   let description = "";
   let publisher = "";
   let publishedDate = "";
+  let isbn = '';
+  let language = '';
 
   try {
     const metadata = await pdfDoc.getMetadata();
     const info = metadata?.info || {};
+    const fields = {
+      title: '', author: '', description: '', publisher: '', publishedDate: '', isbn: '', language: ''
+    };
     if (info.Title && info.Title.trim() && !info.Title.toLowerCase().startsWith('untitled')) {
-      title = info.Title.trim();
+      fields.title = info.Title.trim();
     }
-    if (info.Author && info.Author.trim()) {
-      author = info.Author.trim();
+    if (info.Author && info.Author.trim()) fields.author = info.Author.trim();
+    if (info.Subject && info.Subject.trim()) fields.description = info.Subject.trim();
+    if ((info.Producer || info.Creator) && !fields.publisher) fields.publisher = info.Producer || info.Creator;
+    if (info.CreationDate) fields.publishedDate = String(info.CreationDate);
+    if (info.ISBN) fields.isbn = String(info.ISBN).trim();
+
+    // Fallback XMP: recupera metadados originais quando o Info vier quebrado/vazio
+    if (metadata?.metadata && typeof metadata.metadata.getAll === 'function') {
+      applyXmpFallback(fields, metadata.metadata.getAll());
     }
-    if (info.Subject && info.Subject.trim()) {
-      description = info.Subject.trim();
-    }
-    if (info.Producer || info.Creator) {
-      publisher = info.Producer || info.Creator || '';
-    }
-    if (info.CreationDate) {
-      publishedDate = String(info.CreationDate);
-    }
+
+    title = fields.title || title;
+    author = fields.author || author;
+    description = fields.description || description;
+    publisher = fields.publisher || publisher;
+    publishedDate = fields.publishedDate || publishedDate;
+    isbn = fields.isbn || isbn;
+    language = fields.language || language;
   } catch (err) {
     console.warn('Erro ao ler metadados do PDF:', err);
+  }
+
+  // Degrau 4: PDF escaneado (Info/XMP ausentes) — infere título/autor do texto/OCR da 1ª página
+  if ((title === file.name.replace(/\.[^/.]+$/, "") || author === 'Autor Desconhecido') && rawParagraphs[0]) {
+    const inferred = inferMetadataFromFirstPage(rawParagraphs[0]);
+    if (title === file.name.replace(/\.[^/.]+$/, "") && inferred.title) title = inferred.title;
+    if (author === 'Autor Desconhecido' && inferred.author) author = inferred.author;
   }
 
   // 4. Extrair o Índice (Outline / Bookmarks)
@@ -289,6 +353,8 @@ export async function parsePdfFile(file, onProgress) {
     description,
     publisher,
     publishedDate,
+    isbn,
+    language,
     format: "PDF",
     totalWords: words.length,
     words,

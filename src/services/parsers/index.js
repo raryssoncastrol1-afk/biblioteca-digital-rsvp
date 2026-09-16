@@ -2,12 +2,21 @@ import { parseTxtFile } from './txtParser.js';
 import { parseEpubFile } from './epubParser.js';
 import { parsePdfFile } from './pdfParser.js';
 import { parseDocxFile } from './docxParser.js';
+import { parseMobiFile } from './mobiParser.js';
 import { generateDynamicCover } from './coverGenerator.js';
 import { enrichBookMetadata } from '../metadataEnricher.js';
+import { parseMetadataFromFilename } from './filenamePatterns.js';
 
 /**
  * Parser unificado para múltiplos formatos de documentos com enriquecimento de metadados,
  * extração de índice (TOC) e geração de capas.
+ * 
+ * Cascata de metadados (o primeiro degrau que desbloquear o campo vence):
+ *   1. Nativos do formato (OPF / Info+XMP / EXTH)
+ *   2. Filename (Autor - Título (Ano), ISBN)
+ *   3. OCR da 1ª página (PDF escaneado, dentro de parsePdfFile)
+ *   4. Open Library (enriquecimento: capa/editora/descrição)
+ *   5. Capa dinâmica Canvas
  * 
  * @param {File} file 
  * @param {Function} [onProgress]
@@ -36,12 +45,28 @@ export async function parseDocument(file, onProgress) {
 
     case 'mobi':
     case 'azw3':
-      result = await parseMobiFallback(file);
+      result = await parseMobiFile(file);
       break;
 
     default:
       result = await parseTxtFile(file);
       break;
+  }
+
+  // Degrau 2: filename — preenche só quando o nativo não resolveu
+  const baseName = file.name.replace(/\.[^/.]+$/, "").trim();
+  const fromName = parseMetadataFromFilename(file.name);
+  if ((!result.author || result.author === 'Autor Desconhecido') && fromName.author) {
+    result.author = fromName.author;
+  }
+  if (result.title === baseName && fromName.title) {
+    result.title = fromName.title;
+  }
+  if (!result.isbn && fromName.isbn) {
+    result.isbn = fromName.isbn;
+  }
+  if (!result.publishedDate && fromName.year) {
+    result.publishedDate = fromName.year;
   }
 
   // 1. Tentar enriquecer metadados e capa online via Open Library se a capa não foi embutida ou faltam metadados
@@ -84,33 +109,4 @@ export async function parseDocument(file, onProgress) {
   }
 
   return result;
-}
-
-/**
- * Leitura de fallback para formatos de ebook binários (MOBI / AZW3)
- */
-async function parseMobiFallback(file) {
-  const buffer = await file.arrayBuffer();
-  const decoder = new TextDecoder('utf-8', { fatal: false });
-  const text = decoder.decode(buffer);
-
-  // Extrai trechos de texto legíveis ASCII / Latin / UTF-8
-  const cleanStrings = text.match(/[\w\s.,;:!?áàâãéêíóôõúçÁÀÂÃÉÊÍÓÔÕÚÇ"'\-–—]{4,}/g) || [];
-  const fullText = cleanStrings.join(' ');
-  const words = fullText.split(/\s+/).filter(w => w.length > 0 && !/[^\x20-\x7E\xC0-\xFF]/.test(w));
-
-  return {
-    title: file.name.replace(/\.[^/.]+$/, ""),
-    author: "Autor Desconhecido",
-    format: file.name.split('.').pop()?.toUpperCase() || 'MOBI',
-    totalWords: words.length,
-    words,
-    rawText: fullText,
-    chapters: [{
-      id: "mobi-ch-1",
-      title: "Documento MOBI",
-      startIndex: 0,
-      endIndex: words.length
-    }]
-  };
 }
