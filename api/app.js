@@ -4,7 +4,19 @@ import multer from 'multer';
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 } // 50MB
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB por arquivo
+    files: 10 // Máximo de 10 arquivos simultâneos
+  },
+  fileFilter: (req, file, cb) => {
+    // Permite apenas formatos suportados pelo ecossistema da biblioteca
+    const allowedExts = /\.(epub|pdf|docx|txt|md|mobi|azw3)$/i;
+    if (file.originalname.match(allowedExts)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Formato de arquivo não suportado: ${file.originalname}`));
+    }
+  }
 });
 
 /**
@@ -25,20 +37,28 @@ export function createApiApp() {
     res.json({ success: true, books: memoryBooksStore });
   });
 
-  // Endpoint de upload multipart
-  app.post('/api/upload', upload.array('files'), (req, res) => {
-    const uploadedFiles = req.files || [];
-    const processed = uploadedFiles.map(file => ({
-      name: file.originalname,
-      size: file.size,
-      mimeType: file.mimetype,
-      uploadedAt: Date.now()
-    }));
+  // Endpoint de upload multipart defensivo
+  app.post('/api/upload', (req, res, next) => {
+    upload.array('files', 10)(req, res, (err) => {
+      if (err instanceof multer.MulterError) {
+        return res.status(400).json({ success: false, error: `Erro no upload: ${err.message}` });
+      } else if (err) {
+        return res.status(400).json({ success: false, error: err.message });
+      }
 
-    res.json({
-      success: true,
-      count: uploadedFiles.length,
-      files: processed
+      const uploadedFiles = req.files || [];
+      const processed = uploadedFiles.map(file => ({
+        name: file.originalname,
+        size: file.size,
+        mimeType: file.mimetype,
+        uploadedAt: Date.now()
+      }));
+
+      res.json({
+        success: true,
+        count: uploadedFiles.length,
+        files: processed
+      });
     });
   });
 

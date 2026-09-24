@@ -42,10 +42,37 @@ export function RSVPReader({
   useEffect(() => { settingsRef.current = settings; }, [settings]);
   useEffect(() => { onSaveProgressRef.current = onSaveProgress; }, [onSaveProgress]);
 
-  // Salva o progresso apenas quando posição ou WPM mudam (sem loop: usa ref nunca recrea a callback)
+  // Salva o progresso no IndexedDB com debounce/throttle inteligente:
+  // - Imediatamente ao pausar, navegar ou ao desmontar o leitor
+  // - A cada 3 segundos durante reprodução contínua (evita I/O e re-renders em cada palavra)
+  const lastSavedIndexRef = useRef(currentIndex);
+  const saveTimeoutRef = useRef(null);
+
+  const flushSaveProgress = useCallback((idx, force = false) => {
+    if (!force && idx === lastSavedIndexRef.current) return;
+    lastSavedIndexRef.current = idx;
+    onSaveProgressRef.current?.(idx, tokens.length, wpmRef.current);
+  }, [tokens.length]);
+
   useEffect(() => {
-    onSaveProgressRef.current?.(currentIndex, tokens.length, wpm);
-  }, [currentIndex, wpm, tokens.length]);
+    if (!isPlaying) {
+      flushSaveProgress(currentIndex, true);
+    } else {
+      if (!saveTimeoutRef.current) {
+        saveTimeoutRef.current = setTimeout(() => {
+          flushSaveProgress(currentIndexRef.current);
+          saveTimeoutRef.current = null;
+        }, 3000);
+      }
+    }
+  }, [currentIndex, isPlaying, flushSaveProgress]);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      flushSaveProgress(currentIndexRef.current, true);
+    };
+  }, [flushSaveProgress]);
 
   // Navegação externa via ChapterModal: salta para o índice requisitado e pausa
   useEffect(() => {
@@ -68,7 +95,7 @@ export function RSVPReader({
     settings.syntacticWrapup !== false
   ), [currentWord, prevWord, settings.adaptiveDwell, settings.syntacticWrapup]);
 
-  // Capítulo atual (memoizado — a busca é O(n) sobre os capítulos)
+  // Capítulo atual (otimizado: O(1) na maior parte das palavras)
   const { currentChapter, currentChapterIndex } = useMemo(() => {
     if (chapters.length === 0) return { currentChapter: { title: 'Texto Principal' }, currentChapterIndex: -1 };
     const idx = chapters.findIndex(

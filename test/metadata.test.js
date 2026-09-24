@@ -1,7 +1,7 @@
 import assert from 'assert';
 import { extractMobiHeader, parseMobiFile } from '../src/services/parsers/mobiParser.js';
 import { parseMetadataFromFilename } from '../src/services/parsers/filenamePatterns.js';
-import { applyXmpFallback, inferMetadataFromFirstPage } from '../src/services/parsers/pdfParser.js';
+import { applyXmpFallback, inferMetadataFromFirstPage } from '../src/services/parsers/pdfMetadata.js';
 
 console.log('🧪 Iniciando testes da cascata de metadados (filename / MOBI / XMP / OCR)...\n');
 

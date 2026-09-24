@@ -19,10 +19,19 @@ export async function getOcrWorker(onProgress) {
 }
 
 /**
- * Executa OCR sobre um Canvas ou Imagem
+ * Executa OCR sobre um Canvas ou Imagem de forma segura (resiliente offline)
  */
 export async function performOcrOnCanvas(canvas, onProgress) {
-  const worker = await getOcrWorker(onProgress);
-  const ret = await worker.recognize(canvas);
-  return ret.data.text || '';
+  try {
+    if (typeof navigator !== 'undefined' && !navigator.onLine && !tesseractWorker) {
+      console.warn('Dispositivo offline: download do modelo Tesseract indisponível. Prosseguindo sem OCR.');
+      return '';
+    }
+    const worker = await getOcrWorker(onProgress);
+    const ret = await worker.recognize(canvas);
+    return ret?.data?.text || '';
+  } catch (err) {
+    console.warn('Aviso: Não foi possível processar OCR no arquivo:', err);
+    return '';
+  }
 }

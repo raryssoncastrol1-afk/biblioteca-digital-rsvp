@@ -160,6 +160,7 @@ export function App() {
 
     let importedCount = 0;
     let failedCount = 0;
+    const failedNames = [];
 
     for (let i = 0; i < fileList.length; i++) {
       const file = fileList[i];
@@ -199,10 +200,7 @@ export function App() {
       } catch (err) {
         console.error(`Erro ao importar ${file.name}:`, err);
         failedCount++;
-        setToast({
-          type: 'error',
-          message: `Não foi possível processar "${file.name}". O arquivo pode estar corrompido ou em um formato não suportado.`
-        });
+        failedNames.push(file.name);
       }
     }
 
@@ -212,10 +210,22 @@ export function App() {
       setUploadProgress(0);
     }, 500);
 
-    if (importedCount > 0) {
+    if (importedCount > 0 && failedCount === 0) {
       setToast({
         type: 'success',
-        message: `${importedCount} ${importedCount === 1 ? 'livro importado' : 'livros importados'}${failedCount > 0 ? ` (${failedCount} falha${failedCount > 1 ? 's' : ''})` : ''}.`
+        message: `${importedCount} ${importedCount === 1 ? 'livro importado' : 'livros importados'} com sucesso.`
+      });
+    } else if (importedCount > 0 && failedCount > 0) {
+      setToast({
+        type: 'error',
+        message: `${importedCount} importado(s), porém ${failedCount} com falha (${failedNames.slice(0, 2).join(', ')}${failedCount > 2 ? '...' : ''}).`
+      });
+    } else if (failedCount > 0) {
+      setToast({
+        type: 'error',
+        message: failedCount === 1
+          ? `Não foi possível processar "${failedNames[0]}". O arquivo pode estar corrompido ou em formato não suportado.`
+          : `Falha ao importar os ${failedCount} arquivos selecionados.`
       });
     }
   };

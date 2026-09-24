@@ -19,7 +19,8 @@ async function getSafeVersion(dbName) {
       const dbs = await indexedDB.databases();
       const existing = dbs.find(d => d.name === dbName);
       if (existing && existing.version) {
-        return Math.max(BASE_SAFE_VERSION, existing.version + 1);
+        // Usa a versão existente se for maior ou igual ao BASE_SAFE_VERSION, evitando upgrade a cada recarga
+        return Math.max(BASE_SAFE_VERSION, existing.version);
       }
     }
   } catch (err) {
@@ -29,7 +30,7 @@ async function getSafeVersion(dbName) {
 }
 
 /**
- * Abertura resiliente de banco com criação de stores e auto-recuperação
+ * Abertura resiliente de banco com criação de stores e proteção total contra perda de dados
  */
 async function openResilientDB(dbName, setupFn) {
   const version = await getSafeVersion(dbName);
@@ -54,17 +55,13 @@ async function openResilientDB(dbName, setupFn) {
       request.onerror = () => {
         console.warn(`Erro ao abrir ${dbName} (v${targetVersion}):`, request.error);
         
-        // Se ainda assim ocorrer VersionError, deleta o banco antigo e recria do zero
+        // Se ocorrer VersionError, tenta abrir na versão atual do banco sem especificar versão
+        // Preserva integralmente os dados do usuário, sem jamais invocar deleteDatabase
         if (request.error && request.error.name === 'VersionError') {
-          console.warn(`Resetando ${dbName} para resolver VersionError definitivamente...`);
-          const delRequest = indexedDB.deleteDatabase(dbName);
-          delRequest.onsuccess = () => {
-            const freshReq = indexedDB.open(dbName, BASE_SAFE_VERSION);
-            freshReq.onupgradeneeded = (e) => setupFn(e.target.result);
-            freshReq.onsuccess = () => resolve(freshReq.result);
-            freshReq.onerror = () => reject(freshReq.error);
-          };
-          delRequest.onerror = () => reject(request.error);
+          console.warn(`Tentando abrir ${dbName} na versão corrente do dispositivo (sem upgrade forçado)...`);
+          const fallbackReq = indexedDB.open(dbName);
+          fallbackReq.onsuccess = () => resolve(fallbackReq.result);
+          fallbackReq.onerror = () => reject(fallbackReq.error);
         } else {
           reject(request.error);
         }
@@ -282,25 +279,36 @@ export async function getDocumentContent(bookId) {
 /* ==================== CONFIGURAÇÕES DO USUÁRIO ==================== */
 
 export async function getSetting(key, defaultValue = null) {
-  const db = await openMetadataDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction('settings', 'readonly');
-    const store = transaction.objectStore('settings');
-    const request = store.get(key);
+  try {
+    const db = await openMetadataDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction('settings', 'readonly');
+      const store = transaction.objectStore('settings');
+      const request = store.get(key);
 
-    request.onsuccess = () => resolve(request.result ? request.result.value : defaultValue);
-    request.onerror = () => reject(request.error);
-  });
+      request.onsuccess = () => resolve(request.result ? request.result.value : defaultValue);
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('Fallback para memoryStore (getSetting):', err);
+    return memoryStore.settings.has(key) ? memoryStore.settings.get(key) : defaultValue;
+  }
 }
 
 export async function setSetting(key, value) {
-  const db = await openMetadataDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction('settings', 'readwrite');
-    const store = transaction.objectStore('settings');
-    const request = store.put({ key, value });
+  memoryStore.settings.set(key, value);
+  try {
+    const db = await openMetadataDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction('settings', 'readwrite');
+      const store = transaction.objectStore('settings');
+      const request = store.put({ key, value });
 
-    request.onsuccess = () => resolve(value);
-    request.onerror = () => reject(request.error);
-  });
+      request.onsuccess = () => resolve(value);
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('Fallback para memoryStore (setSetting):', err);
+    return value;
+  }
 }

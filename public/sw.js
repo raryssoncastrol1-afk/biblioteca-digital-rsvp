@@ -1,9 +1,10 @@
-const CACHE_NAME = 'rsvp-focus-cache-v3';
+const CACHE_NAME = 'rsvp-focus-cache-v4';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
   '/reader.bundle.js',
+  '/pdf.worker.min.mjs',
   '/icons/icon-192.png',
   '/icons/icon-512.png'
 ];

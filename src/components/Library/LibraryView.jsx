@@ -65,6 +65,17 @@ export function LibraryView({
     });
   }, [books, searchQuery, selectedFormat]);
 
+  // Paginação progressiva para alta performance com acervos grandes
+  const [displayLimit, setDisplayLimit] = useState(24);
+
+  useEffect(() => {
+    setDisplayLimit(24);
+  }, [searchQuery, selectedFormat]);
+
+  const displayedBooks = useMemo(() => {
+    return filteredBooks.slice(0, displayLimit);
+  }, [filteredBooks, displayLimit]);
+
   // Estatísticas da Estante
   const totalWordsInLibrary = books.reduce((acc, b) => acc + (b.totalWords || 0), 0);
 
@@ -325,7 +336,7 @@ export function LibraryView({
           <>
             {viewMode === 'grid' && (
               <div className="grid grid-cols-2 gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {filteredBooks.map(book => (
+                {displayedBooks.map(book => (
                   <BookCard
                     key={book.id}
                     book={book}
@@ -340,7 +351,7 @@ export function LibraryView({
 
             {viewMode === 'list' && (
               <BookList
-                books={filteredBooks}
+                books={displayedBooks}
                 onOpenFullReader={onOpenFullReader}
                 onOpenMiniPlayer={onOpenMiniPlayer}
                 onOpenDetails={onOpenDetails}
@@ -350,12 +361,26 @@ export function LibraryView({
 
             {viewMode === 'table' && (
               <BookTable
-                books={filteredBooks}
+                books={displayedBooks}
                 onOpenFullReader={onOpenFullReader}
                 onOpenMiniPlayer={onOpenMiniPlayer}
                 onOpenDetails={onOpenDetails}
                 onDelete={handleRequestDelete}
               />
+            )}
+
+            {displayLimit < filteredBooks.length && (
+              <div className="flex flex-col items-center justify-center mt-10 pb-4">
+                <p className="text-xs dark:text-paper-400 text-ink-500 mb-3 font-medium">
+                  Exibindo {displayedBooks.length} de {filteredBooks.length} livros
+                </p>
+                <button
+                  onClick={() => setDisplayLimit(prev => prev + 24)}
+                  className="px-6 py-2.5 rounded-xl border dark:border-ink-700 border-paper-300 dark:bg-ink-800 bg-white hover:bg-brand-500/10 font-bold text-xs uppercase tracking-wider transition shadow-sm"
+                >
+                  Carregar mais livros
+                </button>
+              </div>
             )}
           </>
         )}
