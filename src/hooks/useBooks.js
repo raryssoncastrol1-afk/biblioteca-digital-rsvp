@@ -47,5 +47,11 @@ export function useBooks() {
     setBooks(prev => prev.map(b => b.id === bookMetadata.id ? bookMetadata : b));
   }, []);
 
+  /** Carrega livro + conteúdo completo do documento. */
+  const loadBookWithDoc = useCallback(async (bookId) => {
+    const [book, doc] = await Promise.all([getBookById(bookId), getDocumentContent(bookId)]);
+    return book && doc ? { book, doc } : null;
+  }, []);
+
   return { books, addBook, removeBook, updateProgress, updateBook, loadBookWithDoc };
 }
