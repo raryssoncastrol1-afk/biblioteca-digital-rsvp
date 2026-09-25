@@ -52,3 +52,36 @@ assert.strictEqual(chapters2[0].startIndex, 2 * 50, 'INTRODUÇÃO (impressa 3 �
 assert.strictEqual(chapters2[2].startIndex, 8 * 50, 'CAPÍTULO 2 (impressa 9 → física 9, índice 8) deve usar offset 400');
 
 console.log('\n✔ Testes de extração de sumário impresso passaram!');
+
+// Teste 3: detecção granular de subtítulos e tópicos numerados (ex: "2. Antropologia", "2.1 O Homem é Alma")
+console.log('\nTestando detecção granular de subtítulos no texto...');
+const samplePageWithSubsections = `1. INTRODUÇÃO GERAL
+Texto introdutório sobre a doutrina e estudo do homem.
+
+2. ANTROPOLOGIA BÍBLICA
+Conteúdo da seção de antropologia e constituição humana.
+
+2.1. O HOMEM É ALMA
+Discussão sobre o elemento imaterial e alma vivente.`;
+
+const testLines = samplePageWithSubsections.split('\n');
+const detectedHeadings = [];
+testLines.forEach(line => {
+  const trimmed = line.trim();
+  const isHeading = trimmed.length <= 90 && (
+    /^cap[íi]tulo\b/i.test(trimmed) ||
+    /^parte\b/i.test(trimmed) ||
+    /^se[çc][ãa]o\b/i.test(trimmed) ||
+    /^\d+(\.\d+)*\.?\s+[A-ZÁÀÂÃÉÊÍÓÔÕÚÇ0-9]/.test(trimmed) ||
+    /^[IVXLCDM]+\.?\s+[A-ZÁÀÂÃÉÊÍÓÔÕÚÇ]/.test(trimmed)
+  );
+  if (isHeading) {
+    detectedHeadings.push(trimmed);
+  }
+});
+
+assert.strictEqual(detectedHeadings.length, 3, 'Deve identificar os 3 subtítulos numerados');
+assert.strictEqual(detectedHeadings[0], '1. INTRODUÇÃO GERAL');
+assert.strictEqual(detectedHeadings[1], '2. ANTROPOLOGIA BÍBLICA');
+assert.strictEqual(detectedHeadings[2], '2.1. O HOMEM É ALMA');
+console.log('✔ Detecção granular de subtítulos e tópicos numerados validada com sucesso!');

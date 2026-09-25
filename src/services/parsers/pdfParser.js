@@ -86,24 +86,68 @@ export async function parsePdfFile(file, onProgress) {
     // Registra o offset inicial desta página
     pageWordOffsets.push(currentWordOffset);
 
-    // Extrai o conteúdo de texto da página preservando quebras de linha reais.
-    // Estratégia dupla: usa item.hasEOL quando disponível; além disso, detecta
-    // quebra de linha pela posição X (quando o item volta para a esquerda, é nova linha).
+    // Extrai o conteúdo de texto da página preservando quebras de linha reais e
+    // descartando cabeçalhos e rodapés repetitivos / números de página em margens.
     const textContent = await page.getTextContent();
+    const pageHeight = viewport.height;
     let pageText = '';
     let prevX = null;
+    let prevY = null;
+
+    // Filtra itens: ignora elementos nas bordas extremas que sejam apenas números isolados
+    // (números de página no topo ou rodapé) ou cabeçalhos repetitivos
+    const contentItems = [];
     for (const item of textContent.items) {
       if (!item.str) continue;
-      const x = item.transform ? item.transform[4] : null;
-      // Nova linha se: hasEOL marcado, OU o X retrocedeu significativamente
-      const newLine = item.hasEOL === true ||
-        (prevX !== null && x !== null && x < prevX - 5);
-      if (pageText && newLine) pageText += '\n';
-      pageText += item.str;
-      if (item.hasEOL === true) pageText += '\n';
-      prevX = x;
+      const strTrim = item.str.trim();
+      if (!strTrim) continue;
+
+      const y = item.transform ? item.transform[5] : null;
+      if (y !== null && pageHeight > 0) {
+        const isExtremeMargin = y < pageHeight * 0.08 || y > pageHeight * 0.92;
+        // Se estiver na margem extrema e for apenas um número (número de página)
+        if (isExtremeMargin && /^\d{1,4}$/.test(strTrim)) {
+          continue;
+        }
+      }
+      contentItems.push(item);
     }
-    pageText = pageText.replace(/\s*\n\s*/g, '\n').trim();
+
+    for (const item of contentItems) {
+      const x = item.transform ? item.transform[4] : null;
+      const y = item.transform ? item.transform[5] : null;
+
+      // Nova linha se: hasEOL marcado, OU o X retrocedeu significativamente, OU o Y desceu bastante
+      const newLine = item.hasEOL === true ||
+        (prevX !== null && x !== null && x < prevX - 8) ||
+        (prevY !== null && y !== null && Math.abs(y - prevY) > 8);
+
+      if (newLine && pageText) {
+        // Garante que se o texto anterior terminar com caractere sem espaço, haja quebra com espaço seguro
+        if (!pageText.endsWith('\n') && !pageText.endsWith(' ')) {
+          pageText += '\n';
+        }
+      } else if (pageText && !pageText.endsWith(' ') && !pageText.endsWith('\n')) {
+        // Se estão na mesma linha mas distantes, insere espaço
+        if (prevX !== null && x !== null && (x - prevX > 2)) {
+          pageText += ' ';
+        }
+      }
+
+      pageText += item.str;
+
+      if (item.hasEOL === true && !pageText.endsWith('\n')) {
+        pageText += '\n';
+      }
+      prevX = x ? x + (item.width || 0) : null;
+      prevY = y;
+    }
+
+    // Normaliza quebras de linha e protege colisão de pontuação de final de frase com números (ex: "Deus.2." -> "Deus. 2.")
+    pageText = pageText
+      .replace(/([.!?])([0-9]+(?:\.[0-9]+)*)/g, '$1 $2')
+      .replace(/\s*\n\s*/g, '\n')
+      .trim();
 
     // Se a página tiver quase nenhum texto, tenta OCR via Tesseract WASM
     if (pageText.length < 15 && typeof document !== 'undefined') {
@@ -262,25 +306,54 @@ export async function parsePdfFile(file, onProgress) {
     }
   }
 
-  // Fallback final: se não tiver sumário nativo nem impresso, detecta seções ou cria páginas lógicas
+  // Fallback final: se não tiver sumário nativo nem impresso, detecta seções/subtítulos no texto ou cria páginas lógicas
   if (chapters.length === 0) {
-    // Detecta capítulos por regex no texto de cada página
     const detectedHeadings = [];
-    pageWordOffsets.forEach((offset, pIdx) => {
-      const pNum = pIdx + 1;
+    let runningWordOffset = 0;
+
+    for (let pIdx = 0; pIdx < rawParagraphs.length; pIdx++) {
       const pText = rawParagraphs[pIdx] || '';
-      
-      // Procura padrões como "Capítulo 1", "CAPÍTULO I", "PARTE 1", "Sumário", etc.
-      const match = pText.match(/^(cap[íi]tulo\s+[0-9ivxlcdm]+|parte\s+[0-9ivxlcdm]+|seção\s+[0-9]+|introdução|prefácio|conclusão|sumário|índice)/im);
-      if (match) {
-        detectedHeadings.push({
-          id: `pdf-detected-${detectedHeadings.length + 1}`,
-          title: match[0].slice(0, 60),
-          startIndex: offset,
-          endIndex: words.length
-        });
+      const lines = pText.split('\n');
+      let offsetInPage = 0;
+
+      for (const rawLine of lines) {
+        const line = rawLine.trim();
+        const lineWords = line.split(/\s+/).filter(Boolean);
+        if (!line) continue;
+
+        // Critérios para subtítulo/seção:
+        // 1. Linha com comprimento razoável (< 90 caracteres)
+        // 2. Inicia com marcadores clássicos: "Capítulo N", "Parte N", "Seção N", etc.
+        // 3. OU numeração hierárquica (ex.: "2. Antropologia", "2.1. O Homem é Alma", "I. Introdução")
+        // 4. OU termos canônicos (Introdução, Conclusão, Prefácio, etc.)
+        const isHeading = line.length <= 90 && (
+          /^cap[íi]tulo\b/i.test(line) ||
+          /^parte\b/i.test(line) ||
+          /^se[çc][ãa]o\b/i.test(line) ||
+          /^\d+(\.\d+)*\.?\s+[A-ZÁÀÂÃÉÊÍÓÔÕÚÇ0-9]/.test(line) ||
+          /^[IVXLCDM]+\.?\s+[A-ZÁÀÂÃÉÊÍÓÔÕÚÇ]/.test(line) ||
+          /^(sum[áa]rio|índice|introdu[çc][ãa]o|pref[áa]cio|conclus[ãa]o|ep[íi]logo|pr[óo]logo|anexo|ap[êe]ndice)/i.test(line)
+        );
+
+        if (isHeading) {
+          const headingStart = runningWordOffset + offsetInPage;
+          // Evita adicionar múltiplos subtítulos no exato mesmo offset ou excessivamente próximos (< 10 palavras)
+          const lastHeading = detectedHeadings[detectedHeadings.length - 1];
+          if (!lastHeading || (headingStart - lastHeading.startIndex >= 10)) {
+            detectedHeadings.push({
+              id: `pdf-detected-${detectedHeadings.length + 1}`,
+              title: line.replace(/^#+\s*/, '').slice(0, 70),
+              startIndex: headingStart,
+              endIndex: words.length
+            });
+          }
+        }
+
+        offsetInPage += lineWords.length;
       }
-    });
+
+      runningWordOffset += offsetInPage;
+    }
 
     if (detectedHeadings.length >= 2) {
       for (let i = 0; i < detectedHeadings.length; i++) {

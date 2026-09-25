@@ -21,7 +21,7 @@ const DEFAULT_SETTINGS = {
 };
 
 export function App() {
-  const { books, addBook, removeBook, updateProgress, loadBookWithDoc } = useBooks();
+  const { books, addBook, removeBook, updateProgress, updateBook, loadBookWithDoc } = useBooks();
   const [activeBook, setActiveBook] = useState(null);
   const [activeDoc, setActiveDoc] = useState(null);
 
@@ -236,6 +236,45 @@ export function App() {
     }
   };
 
+  // Reprocessar Livro Existente a partir do originalBlob
+  const handleReprocessBook = async (book, doc) => {
+    if (!doc?.originalBlob) {
+      setToast({ type: 'error', message: 'Arquivo original não disponível para este livro.' });
+      return;
+    }
+
+    try {
+      setToast({ type: 'success', message: `Reprocessando "${book.title}" com novos filtros...` });
+      const parsed = await parseDocument(doc.originalBlob);
+
+      const updatedBook = {
+        ...book,
+        totalWords: parsed.totalWords || parsed.words.length,
+        updatedAt: Date.now()
+      };
+
+      const updatedDoc = {
+        ...doc,
+        tokens: parsed.words,
+        chapters: parsed.chapters || [],
+        rawText: parsed.rawText,
+        updatedAt: Date.now()
+      };
+
+      await updateBook(updatedBook, updatedDoc);
+      setDetailsBook(updatedBook);
+      setDetailsDoc(updatedDoc);
+
+      setToast({
+        type: 'success',
+        message: `"${book.title}" reprocessado com sucesso! ${parsed.chapters?.length || 0} capítulos/seções detectados.`
+      });
+    } catch (err) {
+      console.error('Erro ao reprocessar livro:', err);
+      setToast({ type: 'error', message: 'Falha ao reprocessar o livro.' });
+    }
+  };
+
   // Carregar Livro Clássico de Exemplo (Dom Casmurro de Machado de Assis)
   const handleLoadSampleBook = async () => {
     setIsProcessingUpload(true);
@@ -386,6 +425,7 @@ Ia esquecendo dizer que este Engenho Novo era então um arrabalde quase despovoa
             setDetailsDoc(null);
             handleOpenFullReader(bookId);
           }}
+          onReprocessBook={handleReprocessBook}
         />
       )}
 

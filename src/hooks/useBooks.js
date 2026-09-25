@@ -38,11 +38,14 @@ export function useBooks() {
     return updated;
   }, []);
 
-  /** Carrega livro + conteúdo completo do documento. */
-  const loadBookWithDoc = useCallback(async (bookId) => {
-    const [book, doc] = await Promise.all([getBookById(bookId), getDocumentContent(bookId)]);
-    return book && doc ? { book, doc } : null;
+  /** Atualiza metadados e documento de um livro existente. */
+  const updateBook = useCallback(async (bookMetadata, docContent) => {
+    await saveBook(bookMetadata);
+    if (docContent) {
+      await saveDocumentContent(bookMetadata.id, docContent);
+    }
+    setBooks(prev => prev.map(b => b.id === bookMetadata.id ? bookMetadata : b));
   }, []);
 
-  return { books, addBook, removeBook, updateProgress, loadBookWithDoc };
+  return { books, addBook, removeBook, updateProgress, updateBook, loadBookWithDoc };
 }

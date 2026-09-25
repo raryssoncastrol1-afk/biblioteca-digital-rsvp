@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   X, Play, BookOpen, Clock, FileText, Calendar, 
   Globe, Building2, CheckCircle2, Bookmark, BookText, Search,
-  Download, HardDrive
+  Download, HardDrive, RefreshCw
 } from 'lucide-react';
 import { useEscapeKey } from '../../hooks/useEscapeKey.js';
 import { useFocusTrap } from '../../hooks/useFocusTrap.js';
@@ -21,10 +21,12 @@ export function BookDetailsModal({
   doc,
   chapters = [],
   onStartReadingFromChapter,
-  onOpenFullReader
+  onOpenFullReader,
+  onReprocessBook
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isReprocessing, setIsReprocessing] = useState(false);
   const panelRef = useFocusTrap(isOpen);
 
   useEscapeKey(onClose);
@@ -64,8 +66,9 @@ export function BookDetailsModal({
       }
       const isMarkdown = book.format?.toUpperCase() === 'MD';
       const ext = isMarkdown ? 'md' : 'txt';
-      const fileName = `${book.title || 'documento'}.${ext}`;
-      const blob = new Blob([content], { type: isMarkdown ? 'text/markdown;charset=utf-8' : 'text/plain;charset=utf-8' });
+      // Adiciona o caractere BOM UTF-8 (\uFEFF) no início do arquivo para que leitores
+      // de texto (Android, Windows Notepad, etc.) detectem a codificação UTF-8 automaticamente
+      const blob = new Blob(['\uFEFF', content], { type: isMarkdown ? 'text/markdown;charset=utf-8' : 'text/plain;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -224,6 +227,26 @@ export function BookDetailsModal({
                 <Download className="w-4 h-4 text-brand-400" />
                 <span>{isDownloading ? 'Baixando...' : `Baixar Arquivo (${book.format})`}</span>
               </button>
+
+              {doc?.originalBlob && onReprocessBook && (
+                <button
+                  onClick={async () => {
+                    if (isReprocessing) return;
+                    setIsReprocessing(true);
+                    try {
+                      await onReprocessBook(book, doc);
+                    } finally {
+                      setIsReprocessing(false);
+                    }
+                  }}
+                  disabled={isReprocessing}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl border dark:border-ink-700/60 border-paper-200 dark:bg-ink-900/60 bg-paper-100/60 hover:bg-brand-500/10 dark:hover:text-brand-400 hover:text-brand-600 font-medium text-xs dark:text-paper-300 text-ink-600 transition disabled:opacity-50"
+                  title="Reprocessa o arquivo com os filtros mais recentes de cabeçalho, rodapé e subtítulos"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isReprocessing ? 'animate-spin text-brand-400' : ''}`} />
+                  <span>{isReprocessing ? 'Reprocessando...' : 'Reprocessar Texto e Capítulos'}</span>
+                </button>
+              )}
             </div>
           </div>
 
