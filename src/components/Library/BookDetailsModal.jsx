@@ -1,20 +1,30 @@
 import React, { useState } from 'react';
 import { 
   X, Play, BookOpen, Clock, FileText, Calendar, 
-  Globe, Building2, CheckCircle2, Bookmark, BookText, Search
+  Globe, Building2, CheckCircle2, Bookmark, BookText, Search,
+  Download, HardDrive
 } from 'lucide-react';
 import { useEscapeKey } from '../../hooks/useEscapeKey.js';
 import { useFocusTrap } from '../../hooks/useFocusTrap.js';
+
+function formatBytes(bytes) {
+  if (!bytes || isNaN(bytes)) return null;
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 export function BookDetailsModal({
   isOpen,
   onClose,
   book,
+  doc,
   chapters = [],
   onStartReadingFromChapter,
   onOpenFullReader
 }) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [isDownloading, setIsDownloading] = useState(false);
   const panelRef = useFocusTrap(isOpen);
 
   useEscapeKey(onClose);
@@ -27,6 +37,49 @@ export function BookDetailsModal({
   const filteredChapters = chapters.filter(ch => 
     ch.title.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleDownloadFile = () => {
+    if (!book) return;
+    setIsDownloading(true);
+
+    try {
+      if (doc?.originalBlob) {
+        const fileName = doc.originalFileName || book.originalFileName || `${book.title}.${(book.format || 'txt').toLowerCase()}`;
+        const url = URL.createObjectURL(doc.originalBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+        return;
+      }
+
+      // Fallback: se não houver o blob binário original (ex.: livro criado antes da persistência ou texto puro)
+      const content = doc?.rawText || (doc?.tokens ? doc.tokens.join(' ') : '');
+      if (!content) {
+        alert('Não há conteúdo salvo disponível para download deste livro.');
+        return;
+      }
+      const isMarkdown = book.format?.toUpperCase() === 'MD';
+      const ext = isMarkdown ? 'md' : 'txt';
+      const fileName = `${book.title || 'documento'}.${ext}`;
+      const blob = new Blob([content], { type: isMarkdown ? 'text/markdown;charset=utf-8' : 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    } finally {
+      setTimeout(() => setIsDownloading(false), 500);
+    }
+  };
+
+  const fileSize = book.fileSize || doc?.fileSize || doc?.originalBlob?.size;
 
   return (
 <div
@@ -100,6 +153,13 @@ export function BookDetailsModal({
                 <span className="font-mono dark:text-paper-200 text-ink-800">{(book.totalWords || 0).toLocaleString()}</span>
               </div>
 
+              {fileSize > 0 && (
+                <div className="flex items-center justify-between dark:text-paper-400 text-ink-500">
+                  <span className="flex items-center gap-1.5"><HardDrive className="w-3.5 h-3.5 dark:text-paper-500 text-ink-400" /> Tamanho do Arquivo</span>
+                  <span className="font-mono dark:text-paper-200 text-ink-800">{formatBytes(fileSize)}</span>
+                </div>
+              )}
+
               <div className="flex items-center justify-between dark:text-paper-400 text-ink-500">
                 <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 dark:text-paper-500 text-ink-400" /> Tempo Estimado</span>
                 <span className="font-mono dark:text-paper-200 text-ink-800">~{estimatedMin} min</span>
@@ -142,8 +202,8 @@ export function BookDetailsModal({
               </div>
             )}
 
-            {/* Botão de Ação de Leitura Principal */}
-            <div className="pt-2">
+            {/* Botões de Ação do Livro */}
+            <div className="pt-2 flex flex-col gap-2">
               <button
                 onClick={() => {
                   onClose();
@@ -153,6 +213,16 @@ export function BookDetailsModal({
               >
                 <Play className="w-4 h-4 fill-white" />
                 <span>Iniciar Leitura RSVP</span>
+              </button>
+
+              <button
+                onClick={handleDownloadFile}
+                disabled={isDownloading}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border dark:border-ink-700 border-paper-300 dark:bg-ink-950/80 bg-paper-50/80 hover:bg-brand-500/10 dark:hover:border-brand-500/50 hover:border-brand-400 font-bold text-xs dark:text-paper-200 text-ink-800 transition disabled:opacity-50 shadow-sm"
+                title={`Baixar arquivo do livro (${book.format})`}
+              >
+                <Download className="w-4 h-4 text-brand-400" />
+                <span>{isDownloading ? 'Baixando...' : `Baixar Arquivo (${book.format})`}</span>
               </button>
             </div>
           </div>

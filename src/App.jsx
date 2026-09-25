@@ -182,6 +182,8 @@ export function App() {
           format: parsed.format,
           totalWords: parsed.totalWords || parsed.words.length,
           coverDataUrl: parsed.coverDataUrl || null,
+          originalFileName: file.name,
+          fileSize: file.size || 0,
           progressPercent: 0,
           currentWordIndex: 0,
           lastWpm: 350,
@@ -192,7 +194,11 @@ export function App() {
         const docContent = {
           tokens: parsed.words,
           chapters: parsed.chapters || [],
-          rawText: parsed.rawText
+          rawText: parsed.rawText,
+          originalBlob: file,
+          originalFileName: file.name,
+          mimeType: file.type || '',
+          fileSize: file.size || 0
         };
 
         await addBook(bookMetadata, docContent);
@@ -368,6 +374,7 @@ Ia esquecendo dizer que este Engenho Novo era então um arrabalde quase despovoa
             setDetailsDoc(null);
           }}
           book={detailsBook}
+          doc={detailsDoc}
           chapters={detailsDoc.chapters || []}
           onStartReadingFromChapter={(bookId, startIdx) => {
             setDetailsBook(null);
