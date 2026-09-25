@@ -34,6 +34,18 @@ export function MiniPlayerModal({
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
   useEffect(() => { currentIndexRef.current = currentIndex; }, [currentIndex]);
 
+  const [sectionTransition, setSectionTransition] = useState(null);
+
+  const chapterStartMap = useMemo(() => {
+    const map = new Map();
+    chapters.forEach(ch => {
+      if (ch.startIndex > 0 && ch.title) {
+        map.set(ch.startIndex, ch.title);
+      }
+    });
+    return map;
+  }, [chapters]);
+
   const scheduleNext = useCallback(() => {
     if (!isPlayingRef.current) return;
     if (currentIndexRef.current >= tokens.length - 1) {
@@ -46,6 +58,24 @@ export function MiniPlayerModal({
     const analysis = calculateORP(cur, prv, settings.adaptiveDwell !== false, settings.syntacticWrapup !== false);
     const dwell = calculateDwellTime(wpm, analysis.pauseMultiplier);
 
+    const nextIdx = currentIndexRef.current + 1;
+    const newSectionTitle = chapterStartMap.get(nextIdx);
+
+    if (newSectionTitle) {
+      const transitionDuration = 1800;
+      timerRef.current = setTimeout(() => {
+        setCurrentIndex(nextIdx);
+        currentIndexRef.current = nextIdx;
+        setSectionTransition({ title: newSectionTitle, duration: transitionDuration });
+
+        timerRef.current = setTimeout(() => {
+          setSectionTransition(null);
+          scheduleNext();
+        }, transitionDuration);
+      }, dwell);
+      return;
+    }
+
     timerRef.current = setTimeout(() => {
       setCurrentIndex(prev => {
         const next = prev + 1;
@@ -54,7 +84,7 @@ export function MiniPlayerModal({
       });
       scheduleNext();
     }, dwell);
-  }, [tokens, wpm, settings]);
+  }, [tokens, wpm, settings, chapterStartMap]);
 
   const togglePlay = () => {
     if (isPlayingRef.current) {
@@ -165,25 +195,45 @@ export function MiniPlayerModal({
         )}
 
         {/* Mini RSVP Stage */}
-        <div className="relative h-36 dark:bg-ink-950 bg-paper-50 flex items-center justify-center px-4">
-          <TargetCrosshair accentColor={settings.accentColor || '#ef4444'} />
+        <div className="relative h-36 dark:bg-ink-950 bg-paper-50 flex items-center justify-center px-4 overflow-hidden">
+          {sectionTransition ? (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-4 text-center dark:bg-ink-950/95 bg-paper-50/95 backdrop-blur-md os-fade-in">
+              <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-brand-400 mb-1">
+                <Bookmark className="w-3 h-3" />
+                <span>Nova Seção</span>
+              </span>
+              <h4 className="text-xs sm:text-sm font-bold dark:text-paper-100 text-ink-900 font-display line-clamp-2 max-w-xs mb-2">
+                {sectionTransition.title}
+              </h4>
+              <div className="w-24 h-1 rounded-full dark:bg-ink-800 bg-paper-200 overflow-hidden">
+                <div 
+                  className="h-full bg-brand-500 rounded-full"
+                  style={{ animation: `shrinkWidth ${sectionTransition.duration}ms linear forwards` }}
+                />
+              </div>
+            </div>
+          ) : (
+            <>
+              <TargetCrosshair accentColor={settings.accentColor || '#ef4444'} />
 
-          <div 
-            className="w-full flex items-baseline font-mono tracking-tight select-none"
-            style={{ 
-              fontFamily: settings.fontFamily,
-              fontSize: `min(${settings.fontSize || 30}px, calc((100vw - 64px) / 12))`
-            }}
-          >
-            <span className="flex-1 text-right opacity-90 truncate pr-0.5 dark:text-paper-200 text-ink-800">{orpData.prefix}</span>
-            <span 
-              className="shrink-0 font-black text-center" 
-              style={{ color: settings.accentColor || '#ef4444', minWidth: '0.85ch' }}
-            >
-              {orpData.focalChar || ' '}
-            </span>
-            <span className="flex-1 text-left opacity-90 truncate pl-0.5 dark:text-paper-200 text-ink-800">{orpData.suffix}</span>
-          </div>
+              <div 
+                className="w-full flex items-baseline font-mono tracking-tight select-none"
+                style={{ 
+                  fontFamily: settings.fontFamily,
+                  fontSize: `min(${settings.fontSize || 30}px, calc((100vw - 64px) / 12))`
+                }}
+              >
+                <span className="flex-1 text-right opacity-90 truncate pr-0.5 dark:text-paper-200 text-ink-800">{orpData.prefix}</span>
+                <span 
+                  className="shrink-0 font-black text-center" 
+                  style={{ color: settings.accentColor || '#ef4444', minWidth: '0.85ch' }}
+                >
+                  {orpData.focalChar || ' '}
+                </span>
+                <span className="flex-1 text-left opacity-90 truncate pl-0.5 dark:text-paper-200 text-ink-800">{orpData.suffix}</span>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Controles do Mini-Player */}

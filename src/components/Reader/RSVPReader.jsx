@@ -126,7 +126,22 @@ export function RSVPReader({
     }
   }, [chapters, currentChapterIndex]);
 
-  // Agendador do próximo frame RSVP
+  const [sectionTransition, setSectionTransition] = useState(null); // { title: string, remainingMs: number }
+  const sectionTransitionRef = useRef(null);
+  useEffect(() => { sectionTransitionRef.current = sectionTransition; }, [sectionTransition]);
+
+  // Mapeamento rápido de capítulos por startIndex
+  const chapterStartMap = useMemo(() => {
+    const map = new Map();
+    chapters.forEach(ch => {
+      if (ch.startIndex > 0 && ch.title) {
+        map.set(ch.startIndex, ch.title);
+      }
+    });
+    return map;
+  }, [chapters]);
+
+  // Agendador do próximo frame RSVP com suporte a transição elegante de seções
   const scheduleNextWord = useCallback(() => {
     if (!isPlayingRef.current) return;
 
@@ -145,7 +160,28 @@ export function RSVPReader({
       settingsRef.current.syntacticWrapup !== false
     );
 
-    const dwellMs = calculateDwellTime(wpmRef.current, analysis.pauseMultiplier);
+    const baseDwell = calculateDwellTime(wpmRef.current, analysis.pauseMultiplier);
+
+    // Verifica se a PRÓXIMA palavra é o início de um novo capítulo ou subtítulo
+    const nextIdx = currentIndexRef.current + 1;
+    const newSectionTitle = chapterStartMap.get(nextIdx);
+
+    if (newSectionTitle) {
+      // Ao encontrar um novo capítulo/subtítulo:
+      // Exibe o Card de Transição com pausa reflexiva de 1800ms
+      const transitionDuration = 1800;
+      timerRef.current = setTimeout(() => {
+        setCurrentIndex(nextIdx);
+        currentIndexRef.current = nextIdx;
+        setSectionTransition({ title: newSectionTitle, duration: transitionDuration });
+
+        timerRef.current = setTimeout(() => {
+          setSectionTransition(null);
+          scheduleNextWord();
+        }, transitionDuration);
+      }, baseDwell);
+      return;
+    }
 
     timerRef.current = setTimeout(() => {
       setCurrentIndex(prev => {
@@ -154,8 +190,8 @@ export function RSVPReader({
         return next;
       });
       scheduleNextWord();
-    }, dwellMs);
-  }, [tokens]);
+    }, baseDwell);
+  }, [tokens, chapterStartMap]);
 
   // Iniciar / pausar
   const togglePlay = useCallback(() => {
@@ -351,35 +387,59 @@ export function RSVPReader({
       >
         <div className="relative w-full max-w-2xl h-44 sm:h-56 flex items-center justify-center">
           
-          {/* Mira Visual Foveal */}
-          <TargetCrosshair accentColor={settings.accentColor || '#ef4444'} />
+          {/* Card de Transição de Seção / Subtítulo */}
+          {sectionTransition ? (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-6 text-center rounded-2xl dark:bg-ink-950/95 bg-paper-50/95 backdrop-blur-md border dark:border-brand-500/40 border-brand-400/40 shadow-2xl os-fade-in">
+              <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider dark:bg-brand-500/20 bg-brand-500/10 text-brand-400 mb-2 border border-brand-500/30">
+                <Bookmark className="w-3.5 h-3.5" />
+                <span>Nova Seção / Capítulo</span>
+              </span>
+              <h3 className="text-base sm:text-xl font-bold dark:text-paper-50 text-ink-900 font-display line-clamp-2 max-w-lg mb-3">
+                {sectionTransition.title}
+              </h3>
+              {/* Barra de progresso da pausa reflexiva */}
+              <div className="w-32 h-1 rounded-full dark:bg-ink-800 bg-paper-200 overflow-hidden">
+                <div 
+                  className="h-full bg-brand-500 rounded-full transition-all ease-linear"
+                  style={{ 
+                    animation: `shrinkWidth ${sectionTransition.duration}ms linear forwards` 
+                  }}
+                />
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Mira Visual Foveal */}
+              <TargetCrosshair accentColor={settings.accentColor || '#ef4444'} />
 
-          {/* Renderização Central Fixada do ORP */}
-          <div 
-            className="w-full flex items-baseline font-mono tracking-tight leading-none"
-            style={{ fontSize: `min(${settings.fontSize || 52}px, calc((100vw - 48px) / 12))` }}
-          >
-            {/* Prefixo (alinhado à direita do centro) */}
-            <span className="flex-1 text-right opacity-90 truncate pr-0.5 select-none">
-              {orpData.prefix}
-            </span>
+              {/* Renderização Central Fixada do ORP */}
+              <div 
+                className="w-full flex items-baseline font-mono tracking-tight leading-none"
+                style={{ fontSize: `min(${settings.fontSize || 52}px, calc((100vw - 48px) / 12))` }}
+              >
+                {/* Prefixo (alinhado à direita do centro) */}
+                <span className="flex-1 text-right opacity-90 truncate pr-0.5 select-none">
+                  {orpData.prefix}
+                </span>
 
-            {/* Caractere Focal ORP (fixado no centro da mira) */}
-            <span 
-              className="shrink-0 font-black text-center select-none drop-shadow-sm" 
-              style={{ 
-                color: settings.accentColor || '#ef4444',
-                minWidth: '0.85ch'
-              }}
-            >
-              {orpData.focalChar || ' '}
-            </span>
+                {/* Caractere Focal ORP (fixado no centro da mira) */}
+                <span 
+                  className="shrink-0 font-black text-center select-none drop-shadow-sm" 
+                  style={{ 
+                    color: settings.accentColor || '#ef4444',
+                    minWidth: '0.85ch'
+                  }}
+                >
+                  {orpData.focalChar || ' '}
+                </span>
 
-            {/* Sufixo (alinhado à esquerda do centro) */}
-            <span className="flex-1 text-left opacity-90 truncate pl-0.5 select-none">
-              {orpData.suffix}
-            </span>
-          </div>
+                {/* Sufixo (alinhado à esquerda do centro) */}
+                <span className="flex-1 text-left opacity-90 truncate pl-0.5 select-none">
+                  {orpData.suffix}
+                </span>
+              </div>
+            </>
+          )}
 
         </div>
 

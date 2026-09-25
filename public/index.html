@@ -99,6 +99,10 @@
       from { opacity: 0; transform: translateY(16px) scale(0.98); }
       to { opacity: 1; transform: translateY(0) scale(1); }
     }
+    @keyframes shrinkWidth {
+      from { width: 100%; }
+      to { width: 0%; }
+    }
     .os-fade-in { animation: os-fade-in 180ms ease-out both; }
     .os-sheet-in { animation: os-sheet-in 240ms ease-out both; }
     @media (prefers-reduced-motion: reduce) {
